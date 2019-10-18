@@ -11,11 +11,11 @@ import includes.configs as model_configs
 config_paths = model_configs.get_base_config()
 config = jl.load(config_paths["model path"] + "config.joblib")
 if config["model name"] == "static demographic baseline":
-    data_test, _, _ = model_includes.read_ehrdc_data(config["test path"])
-    p = model_includes.model_static_patient_predict(data_test, config["model"])
+    data = model_includes.read_ehrdc_data(config["test path"])
+    p = model_includes.model_static_patient_predict(data, config["model"])
     p.to_csv(config_paths["output path"]+ "predictions.csv")
 elif config["model name"] == "static uid model selection":
-    jl.load(config_paths["scratch path"] + "uids.joblib")
-    data_test, _, _ = model_includes.read_ehrdc_data(config["test path"])
-    p = model_includes.model_static_patient_predict(data_test, config["model"])
+    uids = jl.load(config_paths["scratch path"] + "uids.joblib")
+    data = model_includes.read_ehrdc_data(config["test path"])
+    p = model_includes.model_sparse_feature_test(data, config, uids=uids)
     p.to_csv(config_paths["output path"] + "predictions.csv")

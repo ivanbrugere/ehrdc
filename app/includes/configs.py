@@ -25,7 +25,7 @@ def get_base_config(model_fn=None, model_params={}, name=None):
     config["train"] = True
     return config
 
-def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200, "n_jobs":-1}, name=None):
+def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200}, name=None):
     config = get_base_config(RandomForestClassifier, model_params, name=name)
     return config
 

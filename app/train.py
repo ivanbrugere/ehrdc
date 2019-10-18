@@ -12,8 +12,7 @@ import includes.configs as model_configs
 
 t = time.time()
 config = model_configs.get_rf_baseline_config()
-config["model name"] = "static model selection"
-
+config["model name"] = "static uid model selection"
 data = model_includes.read_ehrdc_data(config["train path"])
 if "train" in config and config["train"]:
     print("Running: " + config["model name"])
