@@ -4,8 +4,13 @@ from sklearn.naive_bayes import BernoulliNB, ComplementNB, MultinomialNB
 from sklearn.dummy import DummyClassifier
 from sklearn.neighbors import KNeighborsClassifier
 
-def get_base_config(model_fn=None, model_params={}):
+def get_base_config(model_fn=None, model_params={}, name=None):
     config = {}
+    if name is None:
+        config["model name"] = "static uid model selection"
+    else:
+        config["model name"] = name
+
     if model_fn is None:
         config["model_fn"] = GradientBoostingClassifier
     else:
@@ -16,17 +21,16 @@ def get_base_config(model_fn=None, model_params={}):
     config["test path"] = "../infer/"
     config["model path"] = "../model/"
     config["output path"] = "../output/"
+    config["scratch path"] = "../scratch/"
     config["train"] = True
     return config
 
-def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200, "n_jobs":-1}):
-    config = get_base_config(RandomForestClassifier, model_params)
-    config["model name"] = "static simple"
+def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200, "n_jobs":-1}, name=None):
+    config = get_base_config(RandomForestClassifier, model_params, name=name)
     return config
 
-def get_naivebayes_baseline_config():
-    config = get_base_config(BernoulliNB)
-    config["model name"] = "static simple"
+def get_naivebayes_baseline_config(model_params={}, name=None):
+    config = get_base_config(BernoulliNB, model_params, name=name)
     return config
 
 def get_baseline_cv_configs():

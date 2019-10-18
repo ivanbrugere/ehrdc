@@ -17,13 +17,14 @@ config["model name"] = "static model selection"
 data = model_includes.read_ehrdc_data(config["train path"])
 if "train" in config and config["train"]:
     print("Running: " + config["model name"])
-    if config["model name"] == "static baseline":
-        m = model_includes.model_static_patient_train(data, data["death"]["label"], config)
-        jl.dump(m, config["model path"] + "gb_static_patient_gb.joblib")
-    elif config["model name"] == "static model selection":
+    if config["model name"] == "static demographic baseline":
+        config_trained = model_includes.model_static_patient_train(data, data["death"]["label"], config)
+        jl.dump(config_trained, config["model path"] + "config.joblib")
+    elif config["model name"] == "static uid model selection":
         configs = model_configs.get_baseline_cv_configs()
-        model, selected, perf, metrics_out, configs = model_includes.model_sparse_feature_cv(data, configs, iters=10)
+        config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv(data, configs, iters=10)
         print("Selected: " + selected)
         print(perf)
-        jl.dump(model, config["model path"] + "static_modelselection.joblib")
+        jl.dump(config_select, config["model path"] + "config.joblib")
+        jl.dump(uids, config["scratch path"] + "uids.joblib")
 print(time.time() - t)

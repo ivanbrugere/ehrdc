@@ -8,8 +8,14 @@ import joblib as jl
 import includes.models as model_includes
 import includes.configs as model_configs
 
-config = model_configs.get_gb_baseline_config()
-m = jl.load(config["model path"] + "gb_static_patient_gb.joblib")
-data_test, _, _ = model_includes.read_ehrdc_data(config["test path"])
-p = model_includes.model_static_patient_predict(data_test, m)
-p.to_csv(config["output path"]+ "predictions.csv")
+config_paths = model_configs.get_base_config()
+config = jl.load(config_paths["model path"] + "config.joblib")
+if config["model name"] == "static demographic baseline":
+    data_test, _, _ = model_includes.read_ehrdc_data(config["test path"])
+    p = model_includes.model_static_patient_predict(data_test, config["model"])
+    p.to_csv(config_paths["output path"]+ "predictions.csv")
+elif config["model name"] == "static uid model selection":
+    jl.load(config_paths["scratch path"] + "uids.joblib")
+    data_test, _, _ = model_includes.read_ehrdc_data(config["test path"])
+    p = model_includes.model_static_patient_predict(data_test, config["model"])
+    p.to_csv(config_paths["output path"] + "predictions.csv")

@@ -68,10 +68,10 @@ def model_static_patient_preprocess(data_train):
 
 
 def model_static_patient_train(data_train, labels_train, config):
-    model = get_default_model(config)
+
     d = model_static_patient_preprocess(data_train["person"])
-    model.fit(d, labels_train["death"])
-    return model
+    config["model"].fit(d, labels_train["death"])
+    return config
 
 
 def model_static_patient_predict(data_test, model):
@@ -79,13 +79,17 @@ def model_static_patient_predict(data_test, model):
     return pd.DataFrame(model.predict_proba(d)[:, 1], index=data_test["person"]["person_id"], columns=["score"])
 
 
-def get_grouped_features(data_train, config):
+def get_grouped_features(data_train, config, uids=None):
     graph_modalities = get_default_graph_modalities(config)
 
     visits_items = c.defaultdict(set)
     person_items = c.defaultdict(set)
-    uids = dict()
-    uid_iter= 0
+
+    if uids is None:
+        uids = dict()
+        uid_iter= 0
+    else:
+        uid_iter = np.max(list(uids.values()))+1
 
     joins = [(k, get_default_join(config, key=k)) for k in ["person", "visits"]]
 
@@ -116,13 +120,19 @@ def get_grouped_features(data_train, config):
 #         configs[("max_depth", depth)] =  get_rf_baseline_config()
 
 
+def model_sparse_feature_test(data, config, uids):
+    p_ids = data["death"]["person_id"]
+    data_sp, uids = get_sparse_person_features_mat(data, p_ids, config, uids=uids)
+    return pd.DataFrame(config["model"].predict_proba(data_sp)[:, 1], index=data["person"]["person_id"], columns=["score"])
+
+
 def model_sparse_feature_cv(data, configs, iters=10, data_sp=None, uids=None):
 
     p_ids = data["death"]["person_id"]
     labels = data["death"]["label"]
     config_base = list(configs.values())[0]
     if data_sp is None or uids is None:
-        data_sp, uids = get_sparse_person_features_mat(data, p_ids, config_base)
+        data_sp, uids = get_sparse_person_features_mat(data, p_ids, config_base, uids=uids)
     metrics_out = c.defaultdict(list)
     for ii in range(iters):
         config_base = get_default_train_test(config_base)
@@ -134,10 +144,9 @@ def model_sparse_feature_cv(data, configs, iters=10, data_sp=None, uids=None):
             metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred))
     perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
     selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
-
-    model = sk.base.clone(configs[selected]["model"])
-    model.fit(data_sp, labels)
-    return model, selected, perf, metrics_out, configs
+    config_select = sk.base.clone(configs[selected])
+    config_select["model"].fit(data_sp, labels)
+    return config_select, selected, perf, metrics_out, configs, uids
 
 def get_dict_to_sparse(d1):
     a = []
@@ -147,8 +156,8 @@ def get_dict_to_sparse(d1):
     return sp.csr_matrix((np.ones(a.shape[0]), (a[:, 0], a[:, 1])))
 
 
-def get_sparse_person_features_mat(data, labels, config):
-    _, person_items, uids = get_grouped_features(data, config)
+def get_sparse_person_features_mat(data, labels, config, uids):
+    _, person_items, uids = get_grouped_features(data, config, uids=uids)
     person_translated = {i: person_items[uids[("person_id", k)]] for i, k in enumerate(labels)}
     person_sparse = get_dict_to_sparse(person_translated)
     return person_sparse, uids
