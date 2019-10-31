@@ -4,18 +4,34 @@ import pathlib
 import csv
 import collections as c
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-import joblib as jl
-import includes.models as model_includes
-import includes.configs as model_configs
 
+import os
+import sys
+sys.path.extend(['/'])
+if os.path.basename(os.getcwd()) != "app":
+    os.chdir(os.getcwd() +'/app')
+import joblib as jl
+from app import models as model_includes
+from app import configs as model_configs
+import time
+
+
+t = time.time()
 config_paths = model_configs.get_base_config()
 config = jl.load(config_paths["model path"] + "config.joblib")
+
+config["cv split key"] = "dates"
+tt = time.time()
+data = model_includes.read_ehrdc_data(config["test path"])
+print("Data load time:" + str(time.time() - tt))
 if config["model name"] == "static demographic baseline":
-    data = model_includes.read_ehrdc_data(config["test path"])
     p = model_includes.model_static_patient_predict(data, config["model"])
     p.to_csv(config_paths["output path"]+ "predictions.csv")
 elif config["model name"] == "static uid model selection":
     uids = jl.load(config_paths["scratch path"] + "uids.joblib")
-    data = model_includes.read_ehrdc_data(config["test path"])
-    p = model_includes.model_sparse_feature_test(data, config, uids=uids)
+    if "cv split key" in config and config["cv split key"] == "dates":
+        p = model_includes.model_sparse_feature_test(data, config, uids=uids, split_key=config["cv split key"], date_lag=config["date lag"])
+    else:
+        p = model_includes.model_sparse_feature_test(data, config, uids=uids)
     p.to_csv(config_paths["output path"] + "predictions.csv")
+print("total time:" + str(time.time()-t))
