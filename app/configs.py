@@ -21,8 +21,8 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = "../train_small/"
-    config["test path"] = "../infer_small/"
+    config["train path"] = "../train/"
+    config["test path"] = "../infer/"
     config["model path"] = "../model/"
     config["output path"] = "../output/"
     config["scratch path"] = "../scratch/"

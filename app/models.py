@@ -163,15 +163,17 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
         data_sp, labels_translated = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key, date_lag=date_lag)
         p_ids_translated = list(labels_translated.keys())
         p = config["model"].predict_proba(data_sp)
-        p, new_pids = get_grouped_preds(p, p_ids_translated, uids_records, date_lag=date_lag)
+        p, new_pids = get_grouped_preds(p, p_ids_translated, uids_records, p_ids=list(p_ids.keys()), date_lag=date_lag)
+        keys_iter = pd.Series(new_pids, name="person_id")
 
     elif split_key=="id":
         data_sp, labels_iter, keys_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key)
         p = config["model"].predict_proba(data_sp)
+        keys_iter = pd.Series(list(p_ids.keys()), name="person_id")
 
     data = None
     print("Inference time:" + str(time.time() - t))
-    return pd.DataFrame(p[:, 1], index=new_pids, columns=["score"])
+    return pd.DataFrame(p[:, 1], index=keys_iter, columns=["score"])
 
 def get_grouped_preds(p, keys_iter, uids_records,p_ids=None, date_lag=[0]):
     uids_records_rev = {v: k for k, v in uids_records.items()}
