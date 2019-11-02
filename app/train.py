@@ -20,7 +20,7 @@ config = model_configs.get_rf_baseline_config()
 config["model name"] = "static uid model selection"
 config["cv iters"] = 2
 config["cv split key"] = "dates"
-config["cv date lags"] = [[0], [0, 1]]
+config["cv date lags"] = [[0], [0, 1], [0, 1, 2]]
 tt = time.time()
 data = model_includes.read_ehrdc_data(config["train path"])
 print("Data load time:" + str(time.time()-tt))

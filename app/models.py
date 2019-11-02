@@ -199,9 +199,10 @@ def get_grouped_preds(p, keys_iter, uids_records,p_ids=None, date_lag=[0]):
 
 def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key="id", date_lags=[[0]]):
     t = time.time()
-    p_ids = data["death"]["person_id"].copy()
-    label_values = data["death"]["death_date"].copy()
-    labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
+    if split_key=="id":
+        labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
+    else:
+        labels_individual = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["death_date"].copy())}
     config_base = list(configs.values())[0]
 
     person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
@@ -212,7 +213,7 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
 
     labels_store = {}
     for date_lag in date_lags:
-        data_sp, labels_iter, keys_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config_base, key=split_key, label_values=label_values, date_lag=date_lag)
+        data_sp, labels_iter, keys_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base, key=split_key,  date_lag=date_lag)
         labels_store[tuple(date_lag)] = labels_iter
 
         for ii in range(iters):
@@ -223,13 +224,15 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
             for key_c, config in configs.items():
                 key_c = (key_c, tuple(date_lag))
                 print("(Model, iteration): " + str((key_c, ii)))
+                ttt = time.time()
                 config["model"].fit(x_train, y_train)
-                print("CV Train")
+                print("CV Train: " + str(time.time() - ttt))
+                ttt = time.time()
                 y_pred = config["model"].predict_proba(x_test)
-                print("CV Predict")
+                print("CV Predict: " + str(time.time() - ttt) )
                 if split_key == "dates":
                     y_pred, p_ids = get_grouped_preds(y_pred, keys_iter, uids_records, p_ids=None, date_lag=date_lag)
-                    y_test = [labels_individual[k] for k in p_ids]
+                    y_test = [int(labels_individual[k]) for k in p_ids]
                 print("CV Metrics")
                 metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred[:, 1]))
     perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
@@ -272,17 +275,16 @@ def get_dict_to_sparse(d1, shape=None, dtype=np.bool):
     else:
         return sp.csr_matrix((np.ones(a.shape[0]), (a[:, 0], a[:, 1])), shape=shape, dtype=dtype)
 
-def get_sparse_person_features_mat(person_items, uids_records, labels, config, key="id", label_values=None, date_lag=[0]):
-    labels_translated = labels
+def get_sparse_person_features_mat(person_items, uids_records, labels_individual, config, key="id", date_lag=[0]):
     if key == "id":
-        person_translated = [person_items[uids_records[("person_id", k)]] for i, k in enumerate(labels)]
+        person_translated = [person_items[uids_records[("person_id", k)]] for k in labels_individual.keys()]
+        labels_translated = [int(i) for i in labels_individual.values()]
     elif key == "dates":
         uids_records_rev = {v:k for k,v in uids_records.items()}
         label_index = set()
-        if label_values is not None:
-            for lag_i in list(date_lag):
-                label_index = label_index.union(set([(i,j-lag_i) for i,j in zip(labels, label_values) if not np.isnan(j)]))
-            labels_translated = [0 if uids_records_rev[i][1] not in label_index else 1 for i in person_items.keys()]
+        for lag_i in list(date_lag):
+            label_index = label_index.union(set([(i,j-lag_i) for i,j in labels_individual.items() if not np.isnan(j)]))
+        labels_translated = [0 if uids_records_rev[i][1] not in label_index else 1 for i in person_items.keys()]
         person_translated = list(person_items.values())
 
     if "train shape" in config:
