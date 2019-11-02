@@ -153,16 +153,17 @@ def get_grouped_features(data_train, config, uids_feats=None, key="id", join_fie
 
 def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
     t = time.time()
-    p_ids = data["person"]["person_id"].copy()
+    p_ids = {j:i for i, j in enumerate(data["person"]["person_id"].copy())}
 
     person_items, uids_feats, uids_records = get_grouped_features(data, config, uids_feats=uids, key=split_key)
 
     if split_key == "dates":
         if "date lag" in config:
             date_lag = config["date lag"]
-        data_sp, labels_iter, keys_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key, date_lag=date_lag)
+        data_sp, labels_translated = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key, date_lag=date_lag)
+        p_ids_translated = list(labels_translated.keys())
         p = config["model"].predict_proba(data_sp)
-        p, _ = get_grouped_preds(p, keys_iter, uids_records, p_ids, date_lag=date_lag)
+        p, new_pids = get_grouped_preds(p, p_ids_translated, uids_records, date_lag=date_lag)
 
     elif split_key=="id":
         data_sp, labels_iter, keys_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key)
@@ -170,7 +171,7 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
 
     data = None
     print("Inference time:" + str(time.time() - t))
-    return pd.DataFrame(p[:, 1], index=p_ids, columns=["score"])
+    return pd.DataFrame(p[:, 1], index=new_pids, columns=["score"])
 
 def get_grouped_preds(p, keys_iter, uids_records,p_ids=None, date_lag=[0]):
     uids_records_rev = {v: k for k, v in uids_records.items()}
@@ -243,7 +244,7 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
     config_select = configs[selected[0]]
     config_select["date lag"] = selected[1]
     config_select["train shape"] = data_sp.shape
-    config_select["model"].fit(data_sp, labels_store[selected[1]])
+    config_select["model"].fit(data_sp, list(labels_store[selected[1]].values()))
     print("Model cv time: " + str(time.time() - tt))
     return config_select, selected, perf, metrics_out, configs, uids
 
