@@ -201,8 +201,10 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
     t = time.time()
     if split_key=="id":
         labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
+
     else:
         labels_individual = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["death_date"].copy())}
+    labels_back = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
     config_base = list(configs.values())[0]
 
     person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
@@ -213,14 +215,15 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
 
     labels_store = {}
     for date_lag in date_lags:
-        data_sp, labels_iter, keys_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base, key=split_key,  date_lag=date_lag)
+        data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base, key=split_key,  date_lag=date_lag)
         labels_store[tuple(date_lag)] = labels_iter
 
         for ii in range(iters):
             config_base = model_configs.get_default_train_test(config_base)
-            x_train, x_test, y_train, y_test = sk.model_selection.train_test_split(data_sp, labels_iter, train_size=config_base["train size"])
+            x_train, x_test, y_train, y_test, keys_train, keys_test = sk.model_selection.train_test_split(data_sp, list(labels_iter.values()), list(labels_iter.keys()), train_size=config_base["train size"])
             print("CV Train data: " + str((x_train.shape, x_train.nnz, x_train.dtype)))
             print("CV Test data: " + str((x_test.shape, x_test.nnz, x_test.dtype)))
+            #print(keys_train)
             for key_c, config in configs.items():
                 key_c = (key_c, tuple(date_lag))
                 print("(Model, iteration): " + str((key_c, ii)))
@@ -231,8 +234,8 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
                 y_pred = config["model"].predict_proba(x_test)
                 print("CV Predict: " + str(time.time() - ttt) )
                 if split_key == "dates":
-                    y_pred, p_ids = get_grouped_preds(y_pred, keys_iter, uids_records, p_ids=None, date_lag=date_lag)
-                    y_test = [int(labels_individual[k]) for k in p_ids]
+                    y_pred, p_ids = get_grouped_preds(y_pred, keys_test, uids_records, p_ids=None, date_lag=date_lag)
+                    y_test = [int(labels_back[k]) for k in p_ids]
                 print("CV Metrics")
                 metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred[:, 1]))
     perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
@@ -278,20 +281,20 @@ def get_dict_to_sparse(d1, shape=None, dtype=np.bool):
 def get_sparse_person_features_mat(person_items, uids_records, labels_individual, config, key="id", date_lag=[0]):
     if key == "id":
         person_translated = [person_items[uids_records[("person_id", k)]] for k in labels_individual.keys()]
-        labels_translated = [int(i) for i in labels_individual.values()]
+        labels_translated = labels_individual
     elif key == "dates":
         uids_records_rev = {v:k for k,v in uids_records.items()}
         label_index = set()
         for lag_i in list(date_lag):
             label_index = label_index.union(set([(i,j-lag_i) for i,j in labels_individual.items() if not np.isnan(j)]))
-        labels_translated = [0 if uids_records_rev[i][1] not in label_index else 1 for i in person_items.keys()]
+        labels_translated = {i:0 if uids_records_rev[i][1] not in label_index else 1 for i in person_items.keys()}
         person_translated = list(person_items.values())
 
     if "train shape" in config:
         person_sparse = get_dict_to_sparse(person_translated, shape=(len(person_translated), config["train shape"][1]))
     else:
         person_sparse = get_dict_to_sparse(person_translated)
-    return person_sparse, labels_translated, list(person_items.keys())
+    return person_sparse, labels_translated
 
 
 def get_default_join(config, key="visits"):
