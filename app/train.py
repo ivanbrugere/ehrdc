@@ -21,7 +21,7 @@ config["model name"] = "static uid model selection"
 config["cv iters"] = 1
 config["cv split key"] = "id"
 config["cv date lags"] = [[0]]
-config["do cv"] = True
+config["do cv"] = False
 tt = time.time()
 data = model_includes.read_ehrdc_data(config["train path"])
 print("Data load time:" + str(time.time()-tt))

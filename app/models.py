@@ -220,6 +220,8 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
                                                            config_base, key=split_key)
         config_select = config_base
         config_select["model"].fit(data_sp, list(labels_iter.values()))
+        selected = "no CV"
+        perf = {}
     else:
         labels_store = {}
         for date_lag in date_lags:

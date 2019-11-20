@@ -46,9 +46,9 @@ def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_e
 
 def get_baseline_cv_configs():
     configs = dict()
-    configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":600, "per_run_time_limit":100,
+    configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":900, "per_run_time_limit":100,
                                                  "n_jobs":4,
-                                                 "ensemble_size":10, "ensemble_nbest":20, "ml_memory_limit":20000})
+                                                 "ensemble_size":10, "ensemble_nbest":20, "ml_memory_limit":30000})
     #configs["gb"] = get_base_config()
     #configs["knn-25"] = get_base_config(model_fn=KNeighborsClassifier,
     #                                                  model_params={"n_neighbors": 25})
