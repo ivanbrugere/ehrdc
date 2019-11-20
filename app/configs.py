@@ -23,8 +23,8 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = "../train_new/"
-    config["test path"] = "../infer_new/"
+    config["train path"] = "../train/"
+    config["test path"] = "../infer/"
     config["model path"] = "../model/"
     config["output path"] = "../output/"
     config["scratch path"] = "../scratch/"
@@ -46,10 +46,9 @@ def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_e
 
 def get_baseline_cv_configs():
     configs = dict()
-    configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":3000, "per_run_time_limit":500,
-                                                 "resampling_strategy":'cv',
-                                                 "resampling_strategy_arguments":{'folds': 3}, "n_jobs":4,
-                                                 "ensemble_size":5, "ensemble_nbest":10, "ml_memory_limit":30000})
+    configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":600, "per_run_time_limit":100,
+                                                 "n_jobs":4,
+                                                 "ensemble_size":10, "ensemble_nbest":20, "ml_memory_limit":20000})
     #configs["gb"] = get_base_config()
     #configs["knn-25"] = get_base_config(model_fn=KNeighborsClassifier,
     #                                                  model_params={"n_neighbors": 25})

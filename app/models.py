@@ -200,7 +200,7 @@ def get_grouped_preds(p, keys_iter, uids_records,p_ids=None, date_lag=[0]):
             p.append([0, v_a if v_a > 0 else 0])
     return np.array(p), p_ids
 
-def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key="id", date_lags=[[0]]):
+def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key="id", date_lags=[[0]], do_cv=False):
     t = time.time()
     if split_key=="id":
         labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
@@ -215,38 +215,44 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
     metrics_out = c.defaultdict(list)
     print("Data build time: " + str(time.time() - t))
     tt = time.time()
+    if not do_cv:
+        data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual,
+                                                           config_base, key=split_key)
+        config_select = config_base
+        config_select["model"].fit(data_sp, list(labels_iter.values()))
+    else:
+        labels_store = {}
+        for date_lag in date_lags:
+            data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base, key=split_key,  date_lag=date_lag)
+            labels_store[tuple(date_lag)] = labels_iter
 
-    labels_store = {}
-    for date_lag in date_lags:
-        data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base, key=split_key,  date_lag=date_lag)
-        labels_store[tuple(date_lag)] = labels_iter
+            for ii in range(iters):
+                config_base = model_configs.get_default_train_test(config_base)
+                x_train, x_test, y_train, y_test, keys_train, keys_test = sk.model_selection.train_test_split(data_sp, list(labels_iter.values()), list(labels_iter.keys()), train_size=config_base["train size"])
+                print("CV Train data: " + str((x_train.shape, x_train.nnz, x_train.dtype)))
+                print("CV Test data: " + str((x_test.shape, x_test.nnz, x_test.dtype)))
+                #print(keys_train)
+                for key_c, config in configs.items():
+                    key_c = (key_c, tuple(date_lag))
+                    print("(Model, iteration): " + str((key_c, ii)))
+                    ttt = time.time()
+                    config["model"].fit(x_train, y_train)
+                    print("CV Train: " + str(time.time() - ttt))
+                    ttt = time.time()
+                    y_pred = config["model"].predict_proba(x_test)
+                    print("CV Predict: " + str(time.time() - ttt) )
+                    if split_key == "dates":
+                        y_pred, p_ids = get_grouped_preds(y_pred, keys_test, uids_records, p_ids=None, date_lag=date_lag)
+                        y_test = [int(labels_back[k]) for k in p_ids]
+                    print("CV Metrics")
+                    metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred[:, 1]))
+        perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
+        selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
+        config_select = configs[selected[0]]
+        config_select["date lag"] = selected[1]
+        config_select["model"].fit(data_sp, list(labels_store[selected[1]].values()))
 
-        for ii in range(iters):
-            config_base = model_configs.get_default_train_test(config_base)
-            x_train, x_test, y_train, y_test, keys_train, keys_test = sk.model_selection.train_test_split(data_sp, list(labels_iter.values()), list(labels_iter.keys()), train_size=config_base["train size"])
-            print("CV Train data: " + str((x_train.shape, x_train.nnz, x_train.dtype)))
-            print("CV Test data: " + str((x_test.shape, x_test.nnz, x_test.dtype)))
-            #print(keys_train)
-            for key_c, config in configs.items():
-                key_c = (key_c, tuple(date_lag))
-                print("(Model, iteration): " + str((key_c, ii)))
-                ttt = time.time()
-                config["model"].fit(x_train, y_train)
-                print("CV Train: " + str(time.time() - ttt))
-                ttt = time.time()
-                y_pred = config["model"].predict_proba(x_test)
-                print("CV Predict: " + str(time.time() - ttt) )
-                if split_key == "dates":
-                    y_pred, p_ids = get_grouped_preds(y_pred, keys_test, uids_records, p_ids=None, date_lag=date_lag)
-                    y_test = [int(labels_back[k]) for k in p_ids]
-                print("CV Metrics")
-                metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred[:, 1]))
-    perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
-    selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
-    config_select = configs[selected[0]]
-    config_select["date lag"] = selected[1]
     config_select["train shape"] = data_sp.shape
-    config_select["model"].fit(data_sp, list(labels_store[selected[1]].values()))
     print("Model cv time: " + str(time.time() - tt))
     return config_select, selected, perf, metrics_out, configs, uids
 

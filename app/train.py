@@ -21,6 +21,7 @@ config["model name"] = "static uid model selection"
 config["cv iters"] = 1
 config["cv split key"] = "id"
 config["cv date lags"] = [[0]]
+config["do cv"] = True
 tt = time.time()
 data = model_includes.read_ehrdc_data(config["train path"])
 print("Data load time:" + str(time.time()-tt))
@@ -31,7 +32,7 @@ if "train" in config and config["train"]:
         jl.dump(config_trained, config["model path"] + "config.joblib")
     elif config["model name"] == "static uid model selection":
         configs = model_configs.get_baseline_cv_configs()
-        config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, iters=config["cv iters"], split_key=config["cv split key"], date_lags=config["cv date lags"])
+        config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, iters=config["cv iters"], split_key=config["cv split key"], date_lags=config["cv date lags"], do_cv = config["do cv"])
         print("Selected: " + str(selected))
         print(perf)
         jl.dump(config_select, config["model path"] + "config.joblib")
