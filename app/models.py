@@ -257,7 +257,7 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
 
     config_select["train shape"] = data_sp.shape
     print("Model cv time: " + str(time.time() - tt))
-    return config_select, selected, perf, metrics_out, configs, uids
+    return config_select, selected, perf, metrics_out, configs, uids_feats
 
 def empirical_risk(person_feats, labels, th = 20):
     d = c.defaultdict(lambda: [0,0])
