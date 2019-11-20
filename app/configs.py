@@ -1,6 +1,6 @@
 import sklearn as sk
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.naive_bayes import BernoulliNB, ComplementNB, MultinomialNB
+from sklearn.naive_bayes import BernoulliNB #ComplementNB, MultinomialNB
 from sklearn.dummy import DummyClassifier
 from sklearn.neighbors import KNeighborsClassifier
 import xgboost as xgb
@@ -46,7 +46,7 @@ def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_e
 
 def get_baseline_cv_configs():
     configs = dict()
-    configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":900, "per_run_time_limit":100,
+    configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":1500, "per_run_time_limit":300,
                                                  "n_jobs":4,
                                                  "ensemble_size":10, "ensemble_nbest":20, "ml_memory_limit":30000})
     #configs["gb"] = get_base_config()

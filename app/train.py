@@ -16,12 +16,15 @@ import app.models as model_includes
 import app.configs as model_configs
 
 t = time.time()
-config = model_configs.get_rf_baseline_config()
-config["model name"] = "static uid model selection"
-config["cv iters"] = 1
-config["cv split key"] = "id"
-config["cv date lags"] = [[0]]
-config["do cv"] = False
+configs = model_configs.get_baseline_cv_configs()
+
+configs["auto"]["model name"] = "static uid model selection"
+configs["auto"]["cv iters"] = 1
+configs["auto"]["cv split key"] = "id"
+configs["auto"]["cv date lags"] = [[0]]
+configs["auto"]["do cv"] = False
+
+config = configs["auto"]
 tt = time.time()
 data = model_includes.read_ehrdc_data(config["train path"])
 print("Data load time:" + str(time.time()-tt))
