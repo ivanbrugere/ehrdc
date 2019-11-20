@@ -7,7 +7,7 @@ import xgboost as xgb
 import os
 import numpy as np
 from autosklearn import classification as ask
-
+import shutil
 
 os.environ["OMP_NUM_THREADS"] = "8"
 def get_base_config(model_fn=None, model_params={}, name=None):
@@ -49,6 +49,16 @@ def get_baseline_cv_configs():
     configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":1500, "per_run_time_limit":300,
                                                  "n_jobs":4,
                                                  "ensemble_size":10, "ensemble_nbest":20, "ml_memory_limit":30000})
+
+    tmp_path = configs["auto"]["model path"] + "tmp"
+    if os.path.exists(tmp_path) and os.path.isdir(tmp_path):
+        shutil.rmtree(tmp_path)
+    out_path = configs["auto"]["model path"] + "out"
+    if os.path.exists(out_path) and os.path.isdir(out_path):
+        shutil.rmtree(out_path)
+    configs["auto"]["model"].tmp_folder = configs["auto"]["model path"] + "tmp"
+    configs["auto"]["model"].output_folder = configs["auto"]["model path"] + "out"
+
     #configs["gb"] = get_base_config()
     #configs["knn-25"] = get_base_config(model_fn=KNeighborsClassifier,
     #                                                  model_params={"n_neighbors": 25})

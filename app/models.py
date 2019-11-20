@@ -167,7 +167,7 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
         keys_iter = pd.Series(new_pids, name="person_id")
 
     elif split_key=="id":
-        data_sp, labels_iter, keys_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key)
+        data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key)
         p = config["model"].predict_proba(data_sp)
         keys_iter = pd.Series(list(p_ids.keys()), name="person_id")
 
