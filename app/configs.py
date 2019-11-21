@@ -91,19 +91,19 @@ def get_baseline_cv_configs():
     #
 
 
-    configs["LDA-10"] = get_base_config(model_fn=LDA_classifier, model_params={"learning_method":"online", "batch_size":300, "n_jobs":-1,
+    configs["LDA-10"] = get_base_config(model_fn=LDA_classifier, model_params={"learning_method":"online", "batch_size":1000, "n_jobs":-1,
                                                                                "n_components":10})
     configs["LDA-25"] = get_base_config(model_fn=LDA_classifier,
-                                        model_params={"learning_method": "online", "batch_size": 900, "n_jobs": -1,
+                                        model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
                                                       "n_components": 25})
     configs["LDA-50"] = get_base_config(model_fn=LDA_classifier,
-                                        model_params={"learning_method": "online", "batch_size": 900, "n_jobs": -1,
+                                        model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
                                                       "n_components": 50})
     configs["LDA-100"] = get_base_config(model_fn=LDA_classifier,
-                                        model_params={"learning_method": "online", "batch_size": 900, "n_jobs": -1,
+                                        model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
                                                       "n_components": 100})
     configs["LDA-200"] = get_base_config(model_fn=LDA_classifier,
-                                        model_params={"learning_method": "online", "batch_size": 900, "n_jobs": -1,
+                                        model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
                                                       "n_components": 200})
 
 
