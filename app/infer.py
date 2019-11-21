@@ -21,8 +21,6 @@ import time
 t = time.time()
 config_paths = model_configs.get_base_config()
 config = jl.load(config_paths["model path"] + "config.joblib")
-
-config["cv split key"] = "dates"
 tt = time.time()
 data = model_includes.read_ehrdc_data(config["test path"])
 print("Data load time:" + str(time.time() - tt))

@@ -94,10 +94,25 @@ def model_static_patient_predict(data_test, model):
 def apply_indexing(data, config, key="id"):
     index = model_configs.get_default_index(key=key)
     uids_iter = []
+    uids_record = []
     for table_key, col_list in index.items():
+        if "filter path" in config and os.path.exists(config["filter path"] + table_key + "_concepts.csv"):
+            filter = pd.read_csv(config["filter path"] + table_key + "_concepts.csv")
+        else:
+            filter = {}
         for col_key in col_list:
             if isinstance(col_key, str):
-                uids_iter.extend([(col_key, i) for i in set(data[table_key][col_key].dropna())])
+                if col_key in filter:
+                    filter_set = set(filter[col_key])
+                    i_iter = [(col_key, i) for i in set(data[table_key][col_key].dropna()) if i in filter_set]
+                    print(str((table_key, col_key, len(i_iter))))
+                else:
+                    i_iter = [(col_key, i) for i in set(data[table_key][col_key].dropna())]
+                    print(str((table_key, col_key, len(i_iter))))
+                if col_key == config["join field"]:
+                    uids_record.extend(i_iter)
+                else:
+                    uids_iter.extend(i_iter)
             else:
                 (col_key, (fn_field, join_field, fn)) = col_key
                 data[table_key][fn_field] = data[table_key][fn_field].apply(fn)
@@ -106,18 +121,21 @@ def apply_indexing(data, config, key="id"):
                     uids_iter.extend([(join_field, (int(i), int(j))) for i,j in data[table_key][[join_field, fn_field]].dropna().drop_duplicates().values])
         print(str(table_key))
     uids_iter = set(uids_iter)
-    return data, dict(zip(uids_iter, range(len(uids_iter)))), index
+    uids_record = set(uids_record)
+    return data, dict(zip(uids_record, range(len(uids_record)))), dict(zip(uids_iter, range(len(uids_iter)))), index
 
 
-def get_grouped_features(data_train, config, uids_feats=None, key="id", join_field="person_id"):
+def get_grouped_features(data_train, config, uids_feats=None, key="id"):
 
     items = c.defaultdict(set)
     t = time.time()
-    data_train, uids_records, index = apply_indexing(data_train, config, key=key)
+    data_train, uids_records, uids_feats_ret, index = apply_indexing(data_train, config, key=key)
+    if uids_feats is None:
+        uids_feats = uids_feats_ret
     print("Built index: " + str(time.time()-t))
 
-    if uids_feats is None:
-        uids_feats = uids_records
+    join_field = config["join field"]
+
     t = time.time()
     pid_index = c.defaultdict(set)
     for table_key, col_list in index.items():

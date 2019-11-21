@@ -27,7 +27,7 @@ class LDA_classifier:
     def get_factor_risk_vector(self, x, y):
         y_int = [-1 if not x else 1 for x in y]
         x_tran = self.model.transform(x)
-        aa = np.sum(x_tran * np.repeat(np.expand_dims(np.array(y_int), 1), 10, axis=1), axis=0)
+        aa = np.sum(x_tran * np.repeat(np.expand_dims(np.array(y_int), 1), x_tran.shape[1], axis=1), axis=0)
         return 1 - (aa - max(aa)) / (abs(max(aa)) - abs(min(aa)))
 
     def evaluate_factor_risk(self, x):
@@ -49,14 +49,16 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = "../train_small/"
-    config["test path"] = "../infer_small/"
+    config["train path"] = "../train/"
+    config["test path"] = "../infer/"
     config["model path"] = "../model/"
     config["output path"] = "../output/"
     config["scratch path"] = "../scratch/"
+    config["filter path"] = "./filter/"
     config["train"] = True
     config["do cv"] = True
     config["date lags"] = [[0]]
+    config["join field"] = "person_id"
     config["cv iters"] = 1
     config["cv split key"] = "id"
     return config
@@ -93,22 +95,22 @@ def get_baseline_cv_configs():
 
     configs["LDA-10"] = get_base_config(model_fn=LDA_classifier, model_params={"learning_method":"online", "batch_size":1000, "n_jobs":-1,
                                                                                "n_components":10})
-    configs["LDA-25"] = get_base_config(model_fn=LDA_classifier,
+    configs["LDA-20"] = get_base_config(model_fn=LDA_classifier,
                                         model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
-                                                      "n_components": 25})
-    configs["LDA-50"] = get_base_config(model_fn=LDA_classifier,
+                                                      "n_components": 20})
+    configs["LDA-30"] = get_base_config(model_fn=LDA_classifier,
                                         model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
-                                                      "n_components": 50})
-    configs["LDA-100"] = get_base_config(model_fn=LDA_classifier,
-                                        model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
-                                                      "n_components": 100})
-    configs["LDA-200"] = get_base_config(model_fn=LDA_classifier,
-                                        model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
-                                                      "n_components": 200})
+                                                      "n_components": 30})
+    # configs["LDA-40"] = get_base_config(model_fn=LDA_classifier,
+    #                                     model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
+    #                                                   "n_components": 40})
+    # configs["LDA-50"] = get_base_config(model_fn=LDA_classifier,
+    #                                     model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
+    #                                                   "n_components": 50})
 
 
 
-    #configs["gb"] = get_base_config()
+    configs["gb"] = get_base_config()
     #configs["knn-25"] = get_base_config(model_fn=KNeighborsClassifier,
     #                                                  model_params={"n_neighbors": 25})
     #configs["knn-50"] = get_base_config(model_fn=KNeighborsClassifier,model_params={"n_neighbors": 50, "n_jobs":-1 })
@@ -118,12 +120,12 @@ def get_baseline_cv_configs():
     #configs["knn-500"] = get_base_config(model_fn=KNeighborsClassifier, model_params={"n_neighbors": 500})
     #configs["knn-1000"] = get_base_config(model_fn=KNeighborsClassifier, model_params={"n_neighbors": 1000})
     #configs["knn-2000"] = get_base_config(model_fn=KNeighborsClassifier, model_params={"n_neighbors": 2000})
-    #configs["nb"] = get_base_config(model_fn=BernoulliNB)
+    configs["nb"] = get_base_config(model_fn=BernoulliNB)
     #configs["nb-Compliment"] = get_base_config(model_fn=ComplementNB)
     #configs["nb-Multi"] = get_base_config(model_fn=MultinomialNB)
     #configs["random stratified"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "stratified"})
     #configs["random uniform"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "uniform"})
-    #configs["rf"] = get_rf_baseline_config()
+    configs["rf"] = get_rf_baseline_config()
     #configs["xgboost"] = get_xgboost_baseline_config()
     return configs
 
@@ -134,17 +136,18 @@ def str_to_year(x):
 
 def get_default_index(key="id"):
     if key=="id":
-        return {"person": ["person_id","year_of_birth", "gender_concept_id", "race_concept_id"],
-                "condition_occurrence": ["condition_concept_id"],
+        return {"condition_occurrence": ["condition_concept_id"],
                 "procedure_occurrence": ["procedure_concept_id"],
+                "observation":["observation_concept_id"],
                 "measurement": ["measurement_concept_id"],
-                "drug_exposure": ["drug_concept_id"]}
+                "drug_exposure": ["drug_concept_id"],
+                "person": ["year_of_birth", "gender_concept_id", "race_concept_id", "person_id"]}
     elif key=="dates":
         return {"condition_occurrence": [("condition_concept_id", ["condition_start_date","person_id",str_to_year ])],
                 "procedure_occurrence": [("procedure_concept_id", ["procedure_date", "person_id", str_to_year])],
                 "measurement": [("measurement_concept_id", ["measurement_date", "person_id", str_to_year])],
                 "drug_exposure": [("drug_concept_id", ["drug_exposure_start_date", "person_id", str_to_year])],
-                "person": ["person_id","year_of_birth", "gender_concept_id", "race_concept_id"]}
+                "person": ["year_of_birth", "gender_concept_id", "race_concept_id", "person_id"]}
 def get_default_train_test(config):
     if "train size" not in config:
         config["train size"] = 0.5

@@ -1,0 +1,334 @@
+observation_concept_id,concept_name,vocabulary_id
+313232,Hemodialysis-associated hypotension,SNOMED
+432454,Excessive thirst,SNOMED
+141693,Elevated blood-pressure reading without diagnosis of hypertension,SNOMED
+379831,Unilateral neural hearing loss,SNOMED
+433496,Unilateral sensory hearing loss,SNOMED
+433315,Feeding problems in newborn,SNOMED
+433930,Motor vehicle on road in collision with another motor vehicle,SNOMED
+433658,Penicillin adverse reaction,SNOMED
+76128,Unilateral hypoactive labyrinth,SNOMED
+434697,Maternal tobacco abuse,SNOMED
+435372,Underweight,SNOMED
+435928,Abnormal weight loss,SNOMED
+436583,Fall,SNOMED
+435991,Accidental fall,SNOMED
+437165,Motor vehicle traffic accident,SNOMED
+437460,Child sex abuse,SNOMED
+437175,"Fall on same level from slipping, tripping or stumbling",SNOMED
+437470,Benzodiazepine sedative adverse reaction,SNOMED
+437643,Abnormal gait,SNOMED
+437483,Homicide or assault by unarmed fight or brawl,SNOMED
+437525,Overweight,SNOMED
+438872,Excessive eating - polyphagia,SNOMED
+434553,Androgen adverse reaction,SNOMED
+434750,Feeding difficulties and mismanagement,SNOMED
+439996,Anticoagulant adverse reaction,SNOMED
+440922,Diabetic on insulin,SNOMED
+438857,Decrease in height,SNOMED
+441207,Adverse reaction to drug,SNOMED
+436298,Adverse reaction to food,SNOMED
+441488,Adverse reaction to substance,SNOMED
+439237,Assault,SNOMED
+437191,Antibacterial drug adverse reaction,SNOMED
+441482,Administrative reason for encounter,SNOMED
+443373,Drug groups primarily affecting cardiovascular system adverse reaction,SNOMED
+443423,Pedal cycle accident,SNOMED
+432789,Opioid analgesic adverse reaction,SNOMED
+4016041,Diabetic on diet only,SNOMED
+4017161,Requires rabies vaccination course,SNOMED
+432807,Accidents caused by cutting and piercing instruments or objects,SNOMED
+4022081,Living in residential institution,SNOMED
+4022569,Eating / feeding / drinking finding,SNOMED
+4027353,Pattern of alcohol consumption through week,SNOMED
+4031491,Parent/child conflict,SNOMED
+4052083,Measurement of respiratory function,SNOMED
+4053387,FH: Polycystic kidney,SNOMED
+4055657,Serum/plasma protein test,SNOMED
+439141,Abnormal weight gain,SNOMED
+4058706,H/O: leukemia,SNOMED
+439224,Drug allergy,SNOMED
+4063309,Intrauterine death with antenatal problem,SNOMED
+439228,Sulfonamide adverse reaction,SNOMED
+440279,Accident,SNOMED
+4066819,Localized skin eruption caused by drug and medicament,SNOMED
+441194,Overexertion and strenuous movements,SNOMED
+442116,Allergy to eggs,SNOMED
+4074187,Healthcare services,SNOMED
+4076788,Stoma care procedure,SNOMED
+443368,Carbonic anhydrase inhibitor adverse reaction,SNOMED
+4081758,Fracture therapy follow-up,SNOMED
+4082090,Procedure refused,SNOMED
+4084277,Glasgow Coma Score eye opening subscore,SNOMED
+4098353,Red blood cell test,SNOMED
+4139934,Homeless,SNOMED
+442165,Loss of appetite,SNOMED
+4144289,H/O: malignant neoplasm,SNOMED
+4148887,Patient on waiting list,SNOMED
+4149519,Glucose measurement,SNOMED
+4155398,Malingerer,SNOMED
+4164695,Allergy to diagnostic agent,SNOMED
+4168834,Beta lactam adverse reaction,SNOMED
+4177700,History of malignant lymphoma,SNOMED
+4179069,History of malignant neoplasm of thoracic cavity structure,SNOMED
+4180113,History of malignant neoplasm of bone,SNOMED
+4182335,Family history of ischemic heart disease,SNOMED
+4005823,Tobacco user,SNOMED
+4188027,Food allergy,SNOMED
+4192676,Born by cesarean section,SNOMED
+4015930,Requires polio vaccination,SNOMED
+4197913,CA 125 measurement,SNOMED
+4203722,Patient encounter procedure,SNOMED
+4207283,History of drug therapy,SNOMED
+4208970,History of physical abuse,SNOMED
+4214956,History of clinical finding in subject,SNOMED
+4215692,Endocrine studies,SNOMED
+4022061,Blood donor,SNOMED
+4216132,History of malignant neoplasm of urinary system,SNOMED
+4239236,"Blood gases, arterial measurement",SNOMED
+4032376,Physical rehabilitation therapy procedure,SNOMED
+4247398,Health status,SNOMED
+4256640,Body mass index 40+ - severely obese,SNOMED
+4047564,Routine antenatal care,SNOMED
+4261613,Educational problem,SNOMED
+4272032,Prostate specific antigen measurement,SNOMED
+4296024,Family disruption due to divorce,SNOMED
+4014829,Consultation,SNOMED
+4306655,Death,SNOMED
+4307024,Follow-up encounter,SNOMED
+4323344,No loss of consciousness,SNOMED
+4051119,Family history of osteoporosis,SNOMED
+4323345,History of fall,SNOMED
+4324190,History of malignant neoplasm of breast,SNOMED
+4324321,History of malignant neoplasm of tongue,SNOMED
+4326679,Family history of malignant neoplasm of kidney,SNOMED
+4329840,Legal problem,SNOMED
+4333465,History of malignant neoplasm of nervous system,SNOMED
+36713471,Routine postpartum follow-up,SNOMED
+4051241,Family history of asthma,SNOMED
+36717001,Long-term current use of aspirin,SNOMED
+37016166,Exposure to potentially hazardous substance,SNOMED
+37017056,Supervision of high risk pregnancy with poor obstetric history,SNOMED
+37396891,Antineoplastic chemotherapy regimen,SNOMED
+40479792,Exposure to viral hepatitis,SNOMED
+40481305,Measurement of renal function,SNOMED
+40481819,Early satiety,SNOMED
+40481872,Multigravida of advanced maternal age,SNOMED
+40483738,Counseling procedure with explicit context,SNOMED
+4016911,Requires a yellow fever vaccination,SNOMED
+4019953,Donor for medical or surgical procedure,SNOMED
+42539697,External hearing aid in situ,SNOMED
+4019967,Dependence on renal dialysis,SNOMED
+43020581,On waiting list for organ transplant,SNOMED
+43021268,History of malignant neoplasm of stomach,SNOMED
+43021271,History of malignant neoplasm of testis,SNOMED
+4031367,Noncompliance with dietary regimen,SNOMED
+44783302,Exposure to asbestos,SNOMED
+44784408,History of replacement of joint of digit of hand,SNOMED
+4051110,Family history of leukemia,SNOMED
+45757177,Tobacco use in mother complicating childbirth,SNOMED
+45763741,History of malignant neoplasm of renal pelvis,SNOMED
+4058852,H/O: risk factor,SNOMED
+4058857,History of immunosuppressive therapy,SNOMED
+45765650,Surveillance of contraception,SNOMED
+4060705,Body mass index 25-29 - overweight,SNOMED
+45765728,Supervision of high risk pregnancy,SNOMED
+4060985,Body mass index 30+ - obesity,SNOMED
+45766227,Requires varicella vaccination,SNOMED
+4061433,"A/N care: multiparous, older than 35 years",SNOMED
+46270150,History of myeloid leukemia,SNOMED
+4065060,Medicolegal examination,SNOMED
+46272451,Long-term current use of insulin,SNOMED
+4081759,Transplant follow-up,SNOMED
+4084661,Foster care,SNOMED
+4084912,Glasgow Coma Score verbal response subscore,SNOMED
+4088025,Antenatal care status,SNOMED
+4094126,Family problems,SNOMED
+4095498,Diagnostic agent adverse reaction,SNOMED
+4095832,Beta-adrenoceptor agonist adverse reaction,SNOMED
+46272452,Long-term current use of steroid,SNOMED
+4096275,Diagnostic dye adverse reaction,SNOMED
+4098179,Immunology laboratory test,SNOMED
+4144684,Patient referral,SNOMED
+440927,High risk drug monitoring status,SNOMED
+4150222,Blood coagulation panel,SNOMED
+441744,Anti-infectives adverse reaction,SNOMED
+4051568,Family history of mental disorder,SNOMED
+4052625,Financial problem,SNOMED
+4060084,H/O: radiation exposure,SNOMED
+4060188,H/O: miscarriage,SNOMED
+443547,Non-steroidal anti-inflammatory drug adverse reaction,SNOMED
+4086928,IUCD status,SNOMED
+4096435,Drug groups primarily affecting central nervous system adverse reaction,SNOMED
+4014023,Palliative care,SNOMED
+4096848,Ataxic gait,SNOMED
+4117957,Activity,SNOMED
+4119499,Not for resuscitation,SNOMED
+4135421,Body mass index 20-24 - normal,SNOMED
+4143050,H/O: blood disorder,SNOMED
+4149299,Follow-up orthopedic assessment,SNOMED
+4152408,H/O: deliberate self harm,SNOMED
+4152813,Family disruption,SNOMED
+4154624,Problem situation relating to social and personal history,SNOMED
+4155099,Polyphagia symptom,SNOMED
+4158182,Liver function tests - general,SNOMED
+4162908,Loop diuretic adverse reaction,SNOMED
+4014134,Blood chemistry,SNOMED
+4168192,Procedure not done,SNOMED
+4169009,Family history of stroke,SNOMED
+4169307,Allergy to substance,SNOMED
+4170581,Enterostomy management and care,SNOMED
+4171594,Family history of cancer,SNOMED
+4179084,History of malignant neoplasm of uterine body,SNOMED
+4179963,Family history of breast cancer,SNOMED
+4180749,History of malignant neoplasm of prostate,SNOMED
+4190634,History of malignant neoplasm of kidney,SNOMED
+4191386,Fertility care,SNOMED
+4019957,Donor of kidney for transplant,SNOMED
+4212565,History of malignant neoplasm of bladder,SNOMED
+4022062,Bone marrow donor,SNOMED
+4166675,Imprisonment,SNOMED
+4166727,Cervical cytology test,SNOMED
+4182052,"Glucose measurement, fasting",SNOMED
+4186037,Aftercare,SNOMED
+4022661,Housing problem,SNOMED
+4193573,History of emotional abuse,SNOMED
+4023168,Lives alone,SNOMED
+4195512,Toxicology screening test,SNOMED
+4197758,History of malignant neoplasm of endocrine gland,SNOMED
+4215685,Past history of procedure,SNOMED
+4218741,Chews tobacco,SNOMED
+4219484,Suicide attempt,SNOMED
+4230179,Reproductive technology management,SNOMED
+4240902,Allergy to peanuts,SNOMED
+4241216,Oral contraception,SNOMED
+4045159,Hormone measurement,SNOMED
+4246053,Blood test,SNOMED
+4046263,Enzyme measurement,SNOMED
+4046550,Postoperative care,SNOMED
+4239721,Allergy to seafood,SNOMED
+4239756,Component of Glasgow coma scale,SNOMED
+4246974,Suspected chromosome abnormality,SNOMED
+4250603,Adolescent care,SNOMED
+4251903,Family planning surveillance,SNOMED
+4252735,Bereavement,SNOMED
+4253306,Suspected neurological disease,SNOMED
+4265443,Device in situ,SNOMED
+4268558,"Housing, local environment and transport finding",SNOMED
+4047392,Postpartum care,SNOMED
+4276526,Cigarette smoker,SNOMED
+4051114,FH: Diabetes mellitus,SNOMED
+4299954,Feeding problem,SNOMED
+4304360,Preparation of medical certificate,SNOMED
+4305297,Noncompliance with medication regimen,SNOMED
+4307360,Estrogen receptor assay,SNOMED
+4309092,Environment contains chemical hazards,SNOMED
+4310250,Ex-smoker,SNOMED
+4323360,History of cardiovascular surgery,SNOMED
+4324191,History of malignant neoplasm of ovary,SNOMED
+4326681,Family history of malignant neoplasm of ovary,SNOMED
+4053383,FH: Glaucoma,SNOMED
+4327107,History of malignant neoplasm of colon,SNOMED
+4334494,Family history of malignant neoplasm of digestive organ,SNOMED
+4059635,Work maladjustment problem,SNOMED
+4059637,Work environment deleterious,SNOMED
+36716245,Under immunized,SNOMED
+36716761,Neonatal difficulty in feeding at breast,SNOMED
+37119307,Exposure to potentially hazardous chemical,SNOMED
+40479434,Exposure to Rabies virus,SNOMED
+40479553,Cardiac pacemaker in situ,SNOMED
+43021265,History of lymphoid leukemia,SNOMED
+43021272,History of malignant neoplasm of liver,SNOMED
+43021867,Problem related to social environment,SNOMED
+43530675,Exposure to tuberculosis,SNOMED
+4060243,A/N care: elderly primiparous,SNOMED
+44784283,Requires influenza virus vaccination,SNOMED
+45766222,"Requires diphtheria, tetanus and pertussis vaccination",SNOMED
+45766277,Cardiac implant in situ,SNOMED
+4081756,Radiotherapy follow-up,SNOMED
+46270007,Family history of sudden cardiac death,SNOMED
+46270078,History of estrogen therapy,SNOMED
+46273937,Long-term current use of anticoagulant,SNOMED
+4083352,Glasgow Coma Score motor response subscore,SNOMED
+46274064,History of antineoplastic chemotherapy,SNOMED
+4096268,Aspirin adverse reaction,SNOMED
+4098519,LDH blood measurement,SNOMED
+4139681,Allergy to dairy product,SNOMED
+4144274,Housing lack,SNOMED
+4147565,Body mass index less than 20,SNOMED
+4164546,Angiotensin-converting-enzyme inhibitor adverse reaction,SNOMED
+4167217,Family history of clinical finding,SNOMED
+4173786,Antenatal care,SNOMED
+4174707,Dietary management surveillance,SNOMED
+4178769,History of malignant neoplasm of esophagus,SNOMED
+4178782,History of malignant neoplasm of cervix,SNOMED
+4179214,Family history of malignant neoplasm of gastrointestinal tract,SNOMED
+4179242,History of malignant neoplasm of skin,SNOMED
+4187203,History of malignant neoplasm of female genital organ,SNOMED
+4201412,Speech therapy,SNOMED
+4279614,Asphyxiation,SNOMED
+4302371,"Anaphylactic shock, due to adverse effect of correct medicinal substance properly administered",SNOMED
+4309371,Occupational therapy,SNOMED
+4326678,Family history of genetic disorder carrier,SNOMED
+4326810,Stem cell donor,SNOMED
+4327415,Family history of malignant neoplasm of testis,SNOMED
+4353605,Tumor marker measurement,SNOMED
+36713460,Supervision of pregnancy with history of infertility,SNOMED
+36717636,Supervision of pregnancy with history of insufficient antenatal care,SNOMED
+37109774,Requires vaccination,SNOMED
+37117058,Vaccination not done,SNOMED
+4208414,C-reactive protein measurement,SNOMED
+40479328,Exposure to Human immunodeficiency virus,SNOMED
+4208622,Microscopic examination of cervical Papanicolaou smear,SNOMED
+40479809,Exposure to Mycobacterium tuberculosis,SNOMED
+4212065,Erythrocyte sedimentation rate measurement,SNOMED
+40483078,Measurement of alcohol in blood specimen,SNOMED
+40484010,Unilateral conductive hearing loss,SNOMED
+40485017,Exposure to communicable disease,SNOMED
+42709971,Biologic cardiac valve prosthesis in situ,SNOMED
+4219847,Disease suspected,SNOMED
+43021270,History of malignant neoplasm of larynx,SNOMED
+43530881,Suspected fetal disorder,SNOMED
+4244721,Carcinoembryonic antigen measurement,SNOMED
+43531662,Vaccine refused by patient,SNOMED
+44791635,Family history of alcohol misuse,SNOMED
+44793477,Antenatal screening status,SNOMED
+45766228,Requires tetanus and diphtheria vaccination,SNOMED
+46270077,History of neuroendocrine malignant neoplasm,SNOMED
+4251171,Unemployed,SNOMED
+46272450,Long-term current use of drug therapy,SNOMED
+4261836,Thyroid panel,SNOMED
+4262119,Human papillomavirus DNA detection,SNOMED
+4305272,Contraception care,SNOMED
+46272734,Long-term current use of antibiotic,SNOMED
+4312538,Inadequate immune status,SNOMED
+4322482,Noncompliance with treatment,SNOMED
+4325851,History of malignant neoplasm of thyroid,SNOMED
+4326265,Employment problem,SNOMED
+36685919,Allergy to diagnostic dye,SNOMED
+36712857,Family disruption due to death of family member,SNOMED
+37016200,Exposure to viral disease,SNOMED
+37017058,Supervision of high risk pregnancy with poor reproductive history,SNOMED
+37017812,Environmental tobacco smoke exposure,SNOMED
+40479426,Exposure to sexually transmissible disorder,SNOMED
+40479428,Exposure to varicella,SNOMED
+40479849,Sexual abuse of adult,SNOMED
+40481022,Automatic implantable cardiac defibrillator in situ,SNOMED
+42535090,Need for personal care assistance,SNOMED
+42536906,History of allergy to drug,SNOMED
+42872666,Insulin pump present,SNOMED
+43021266,History of malignant neoplasm of brain,SNOMED
+43021273,History of Hodgkin lymphoma,SNOMED
+43021378,Suspected infectious disease,SNOMED
+44782460,History of implantation of joint prosthesis into elbow joint,SNOMED
+44782983,History of malignant hematologic neoplasm,SNOMED
+44784264,Consultation for malignant neoplasm disease,SNOMED
+45754692,Hospital visit - subsequent,HCPCS
+45763657,Suspected hereditary disease,SNOMED
+45765733,Supervision of high risk pregnancy for multigravida age 15 years or younger,SNOMED
+45771329,"Requires measles, mumps and rubella vaccination",SNOMED
+45773394,Surveillance of oral contraception,SNOMED
+46270032,Non-compliance with renal dialysis,SNOMED
+46270149,History of skin and/or subcutaneous tissue disease,SNOMED
+46272453,Long-term current use of inhaled steroid,SNOMED
+46274037,History of malignant neoplasm of eye,SNOMED
