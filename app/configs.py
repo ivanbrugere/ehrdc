@@ -10,6 +10,32 @@ from autosklearn import classification as ask
 import shutil
 
 os.environ["OMP_NUM_THREADS"] = "8"
+
+
+class LDA_classifier:
+    def __init__(self, **kwargs):
+        self.model = sk.decomposition.LatentDirichletAllocation(**kwargs)
+        self.weights = None
+
+    def fit(self, X, y):
+        self.fit(X)
+        self.weights = self.get_factor_risk_vector(X, y)
+
+    def predict_proba(self, X):
+        return self.evaluate_factor_risk(X)
+
+    def get_factor_risk_vector(self, x, y):
+        y_int = [-1 if not x else 1 for x in y]
+        x_tran = self.model.transform(x)
+        aa = np.sum(x_tran * np.repeat(np.expand_dims(np.array(y_int), 1), 10, axis=1), axis=0)
+        return 1 - (aa - max(aa)) / (abs(max(aa)) - abs(min(aa)))
+
+    def evaluate_factor_risk(self, x):
+        x_tran = self.model.transform(x)
+        risks = np.sum(np.repeat(np.expand_dims(self.weights, 0), x_tran.shape[0], axis=0) * x_tran, axis=1)
+        return np.vstack((np.zeros(len(risks)), risks)).transpose()
+
+
 def get_base_config(model_fn=None, model_params={}, name=None):
     config = {}
     if name is None:
@@ -23,12 +49,16 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = "../train/"
-    config["test path"] = "../infer/"
+    config["train path"] = "../train_small/"
+    config["test path"] = "../infer_small/"
     config["model path"] = "../model/"
     config["output path"] = "../output/"
     config["scratch path"] = "../scratch/"
     config["train"] = True
+    config["do cv"] = True
+    config["date lags"] = [[0]]
+    config["cv iters"] = 1
+    config["cv split key"] = "id"
     return config
 
 def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200,"n_jobs":-1}, name=None):
@@ -46,18 +76,37 @@ def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_e
 
 def get_baseline_cv_configs():
     configs = dict()
-    configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":1500, "per_run_time_limit":300,
-                                                 "n_jobs":4,
-                                                 "ensemble_size":10, "ensemble_nbest":20, "ml_memory_limit":30000})
+    # configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":1500, "per_run_time_limit":300,
+    #                                              "n_jobs":8,
+    #                                              "ensemble_size":10, "ensemble_nbest":20, "ml_memory_limit":30000})
+    #
+    # tmp_path = configs["auto"]["model path"] + "tmp"
+    # if os.path.exists(tmp_path) and os.path.isdir(tmp_path):
+    #     shutil.rmtree(tmp_path)
+    # out_path = configs["auto"]["model path"] + "out"
+    # if os.path.exists(out_path) and os.path.isdir(out_path):
+    #     shutil.rmtree(out_path)
+    # configs["auto"]["model"].tmp_folder = configs["auto"]["model path"] + "tmp"
+    # configs["auto"]["model"].output_folder = configs["auto"]["model path"] + "out"
+    #
 
-    tmp_path = configs["auto"]["model path"] + "tmp"
-    if os.path.exists(tmp_path) and os.path.isdir(tmp_path):
-        shutil.rmtree(tmp_path)
-    out_path = configs["auto"]["model path"] + "out"
-    if os.path.exists(out_path) and os.path.isdir(out_path):
-        shutil.rmtree(out_path)
-    configs["auto"]["model"].tmp_folder = configs["auto"]["model path"] + "tmp"
-    configs["auto"]["model"].output_folder = configs["auto"]["model path"] + "out"
+
+    configs["LDA-10"] = get_base_config(model_fn=LDA_classifier, model_params={"learning_method":"online", "batch_size":300, "n_jobs":-1,
+                                                                               "n_components":10})
+    configs["LDA-25"] = get_base_config(model_fn=LDA_classifier,
+                                        model_params={"learning_method": "online", "batch_size": 300, "n_jobs": -1,
+                                                      "n_components": 25})
+    configs["LDA-50"] = get_base_config(model_fn=LDA_classifier,
+                                        model_params={"learning_method": "online", "batch_size": 300, "n_jobs": -1,
+                                                      "n_components": 50})
+    configs["LDA-100"] = get_base_config(model_fn=LDA_classifier,
+                                        model_params={"learning_method": "online", "batch_size": 300, "n_jobs": -1,
+                                                      "n_components": 100})
+    configs["LDA-200"] = get_base_config(model_fn=LDA_classifier,
+                                        model_params={"learning_method": "online", "batch_size": 300, "n_jobs": -1,
+                                                      "n_components": 200})
+
+
 
     #configs["gb"] = get_base_config()
     #configs["knn-25"] = get_base_config(model_fn=KNeighborsClassifier,
@@ -69,7 +118,7 @@ def get_baseline_cv_configs():
     #configs["knn-500"] = get_base_config(model_fn=KNeighborsClassifier, model_params={"n_neighbors": 500})
     #configs["knn-1000"] = get_base_config(model_fn=KNeighborsClassifier, model_params={"n_neighbors": 1000})
     #configs["knn-2000"] = get_base_config(model_fn=KNeighborsClassifier, model_params={"n_neighbors": 2000})
-    #configs["nb"] = get_base_config(model_fn=ComplementNB)
+    #configs["nb"] = get_base_config(model_fn=BernoulliNB)
     #configs["nb-Compliment"] = get_base_config(model_fn=ComplementNB)
     #configs["nb-Multi"] = get_base_config(model_fn=MultinomialNB)
     #configs["random stratified"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "stratified"})

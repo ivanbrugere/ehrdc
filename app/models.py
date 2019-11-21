@@ -12,6 +12,7 @@ import scipy.sparse as sp
 import itertools as it
 import datetime
 import time
+from autosklearn import classification as ask
 if os.path.basename(os.getcwd()) != "app":
     os.chdir(os.getcwd() +'/app')
 
@@ -200,7 +201,7 @@ def get_grouped_preds(p, keys_iter, uids_records,p_ids=None, date_lag=[0]):
             p.append([0, v_a if v_a > 0 else 0])
     return np.array(p), p_ids
 
-def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key="id", date_lags=[[0]], do_cv=False):
+def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
     t = time.time()
     if split_key=="id":
         labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
@@ -209,6 +210,10 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
         labels_individual = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["death_date"].copy())}
     labels_back = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
     config_base = list(configs.values())[0]
+
+    date_lags = config_base["date lags"]
+    do_cv = config_base["do cv"]
+    iters = config_base["cv iters"]
 
     person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
     data = None
@@ -253,7 +258,11 @@ def model_sparse_feature_cv_train(data, configs, iters=10, uids=None, split_key=
         selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
         config_select = configs[selected[0]]
         config_select["date lag"] = selected[1]
-        config_select["model"].fit(data_sp, list(labels_store[selected[1]].values()))
+        if isinstance(config_select["model"], ask.AutoSklearnClassifier):
+            print("refit")
+            config_select["model"].refit(data_sp, list(labels_store[selected[1]].values()))
+        else:
+            config_select["model"].fit(data_sp, list(labels_store[selected[1]].values()))
 
     config_select["train shape"] = data_sp.shape
     print("Model cv time: " + str(time.time() - tt))
@@ -317,3 +326,5 @@ def get_default_join(config, key="visits"):
             return "person_id"
     else:
         return config[key]
+
+
