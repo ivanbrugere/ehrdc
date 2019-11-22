@@ -133,6 +133,7 @@ def get_baseline_cv_configs():
     lambdas = [0, 0.5, 1]
     boosters = ["gbtree", "dart", "gblinear"]
     trees = ["auto", "hist"]
+
     for o in objectives:
         for a in alphas:
             for l in lambdas:

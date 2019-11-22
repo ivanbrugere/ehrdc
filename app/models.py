@@ -192,6 +192,9 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
 
     data = None
     print("Inference time:" + str(time.time() - t))
+    p[p < 0] = 0
+    p[p>1] = 1
+    p[np.isnan(p)] = 0
     return pd.DataFrame(p[:, 1], index=keys_iter, columns=["score"])
 
 def get_grouped_preds(p, keys_iter, uids_records,p_ids=None, date_lag=[0]):
@@ -272,6 +275,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                         y_test = [int(labels_back[k]) for k in p_ids]
                     print("CV Metrics")
                     metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred[:, 1]))
+                    #print(y_pred)
         perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
         selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
         config_select = configs[selected[0]]
