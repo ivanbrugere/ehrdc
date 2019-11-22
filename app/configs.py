@@ -80,7 +80,7 @@ def get_baseline_cv_configs():
     configs = dict()
     # configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":1500, "per_run_time_limit":300,
     #                                              "n_jobs":8,
-    #                                              "ensemble_size":10, "ensemble_nbest":20, "ml_memory_limit":30000})
+    #                                              "ensemble_size":3, "ensemble_nbest":20, "ml_memory_limit":30000})
     #
     # tmp_path = configs["auto"]["model path"] + "tmp"
     # if os.path.exists(tmp_path) and os.path.isdir(tmp_path):
@@ -90,17 +90,17 @@ def get_baseline_cv_configs():
     #     shutil.rmtree(out_path)
     # configs["auto"]["model"].tmp_folder = configs["auto"]["model path"] + "tmp"
     # configs["auto"]["model"].output_folder = configs["auto"]["model path"] + "out"
-    #
+    # #
 
 
-    configs["LDA-10"] = get_base_config(model_fn=LDA_classifier, model_params={"learning_method":"online", "batch_size":1000, "n_jobs":-1,
-                                                                               "n_components":10})
-    configs["LDA-20"] = get_base_config(model_fn=LDA_classifier,
-                                        model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
-                                                      "n_components": 20})
-    configs["LDA-30"] = get_base_config(model_fn=LDA_classifier,
-                                        model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
-                                                      "n_components": 30})
+    # configs["LDA-10"] = get_base_config(model_fn=LDA_classifier, model_params={"learning_method":"online", "batch_size":1000, "n_jobs":-1,
+    #                                                                            "n_components":10})
+    # configs["LDA-20"] = get_base_config(model_fn=LDA_classifier,
+    #                                     model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
+    #                                                   "n_components": 20})
+    # configs["LDA-30"] = get_base_config(model_fn=LDA_classifier,
+    #                                     model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
+    #                                                   "n_components": 30})
     # configs["LDA-40"] = get_base_config(model_fn=LDA_classifier,
     #                                     model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
     #                                                   "n_components": 40})
@@ -126,7 +126,26 @@ def get_baseline_cv_configs():
     #configs["random stratified"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "stratified"})
     #configs["random uniform"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "uniform"})
     configs["rf"] = get_rf_baseline_config()
-    #configs["xgboost"] = get_xgboost_baseline_config()
+
+    p = {"max_depth": 12, "n_jobs:": 8, "n_estimators": 150}
+    objectives = ["binary:logistic", "reg:squarederror"]
+    alphas = [0, 0.5, 1]
+    lambdas = [0, 0.5, 1]
+    boosters = ["gbtree", "dart", "gblinear"]
+    trees = ["auto", "hist"]
+    for o in objectives:
+        for a in alphas:
+            for l in lambdas:
+                if a != l:
+                    for b in boosters:
+                        for t1 in trees:
+                            p2 = p.copy()
+                            p2["booster"] = b
+                            p2["reg_lambda"] = l
+                            p2["reg_alpha"] = a
+                            p2["objective"] = o
+                            p2["tree_method"] = t1
+                            configs[("xgboost", o, a, l, b, t1)] = get_xgboost_baseline_config(model_params=p2)
     return configs
 
 
