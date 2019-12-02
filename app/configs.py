@@ -131,22 +131,46 @@ def get_baseline_cv_configs():
     objectives = ["binary:logistic", "reg:squarederror"]
     alphas = [0, 0.5, 1]
     lambdas = [0, 0.5, 1]
+    ns = [150, 300, 450]
+    sample_type = ["uniform", "weighted"]
+    feature_selector = ["cyclic", "greedy"]
+    maxes = [15]
     boosters = ["gbtree", "dart", "gblinear"]
     trees = ["auto", "hist"]
-
+    scale_pos_weights = [1, 4, 8]
     for o in objectives:
         for a in alphas:
             for l in lambdas:
-                if a != l:
-                    for b in boosters:
-                        for t1 in trees:
-                            p2 = p.copy()
-                            p2["booster"] = b
-                            p2["reg_lambda"] = l
-                            p2["reg_alpha"] = a
-                            p2["objective"] = o
-                            p2["tree_method"] = t1
-                            configs[("xgboost", o, a, l, b, t1)] = get_xgboost_baseline_config(model_params=p2)
+                for n in ns:
+                    for m in maxes:
+                        for b in boosters:
+                                for t1 in trees:
+                                    p2 = p.copy()
+                                    p2["n_estimators"] = n
+                                    p2["booster"] = b
+                                    p2["max_depth"] = m
+                                    p2["reg_lambda"] = l
+                                    p2["reg_alpha"] = a
+                                    p2["objective"] = o
+                                    p2["tree_method"] = t1
+                                    if b == "gbtree":
+                                        for s in scale_pos_weights:
+                                            p2["scale_pos_weight"] = s
+                                            configs[("xgboost", o, a, l, b, t1, s)] = get_xgboost_baseline_config(model_params=p2)
+                                    elif b == "dart":
+                                        for st in sample_type:
+                                            p2["sample_type"] = st
+                                            configs[("xgboost", o, a, l, b, t1, st)] = get_xgboost_baseline_config(
+                                                model_params=p2)
+                                    elif b == "gblinear":
+                                        for fs in feature_selector:
+                                            p2["feature_selector"] = fs
+                                            configs[("xgboost", o, a, l, b, t1, fs)] = get_xgboost_baseline_config(
+                                                model_params=p2)
+                                    else:
+                                        configs[("xgboost", o, a, l, b, t1)] = get_xgboost_baseline_config(
+                                            model_params=p2)
+    print("Models #: " + str(len(configs)))
     return configs
 
 
