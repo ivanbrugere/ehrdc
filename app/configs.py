@@ -128,11 +128,11 @@ def get_baseline_cv_configs():
     configs["rf"] = get_rf_baseline_config()
 
     p = {"max_depth": 12, "n_jobs:": 8, "n_estimators": 300, "nthread":0, "eval_metric":"auc"}
-    objectives = ["binary:logistic", "reg:squarederror"]
-    ns = [300]
+    objectives = ["binary:logistic"]
+    ns = [250]
     sample_type = ["weighted"]
     feature_selector = ["cyclic", "shuffle"]
-    maxes = [12]
+    maxes = [8]
     boosters = ["gbtree", "dart", "gblinear"]
     trees = ["auto", "hist"]
     scale_pos_weights = [1, 5]
