@@ -8,8 +8,41 @@ import os
 import numpy as np
 from autosklearn import classification as ask
 import shutil
+from sklearn.model_selection import GridSearchCV
+
+import numpy as np
+from sklearn.datasets import make_classification
+from torch import nn
+import torch.nn.functional as F
+from sklearn.model_selection import GridSearchCV
+from skorch import NeuralNetClassifier
 
 os.environ["OMP_NUM_THREADS"] = "8"
+
+
+class DeepEHR(nn.Module):
+    def __init__(self, input_size=6369, num_units1=100, num_units2=50,num_units3=25, nonlinear=F.relu):
+        super(DeepEHR, self).__init__()
+
+        self.dense0 = nn.Linear(input_size, num_units1)
+        self.nonlinear = nonlinear
+        self.dropout = nn.Dropout(0.5)
+        self.dense1 = nn.Linear(num_units1, num_units2)
+        self.dense2 = nn.Linear(num_units2, num_units3)
+        self.dense3 = nn.Linear(num_units3, 10)
+        self.output = nn.Linear(10, 2)
+        self.sizes = [input_size, num_units1, num_units2, num_units3]
+
+    def forward(self, X, **kwargs):
+        X = self.nonlinear(self.dense0(X))
+        X = self.dropout(X)
+        X = F.relu(self.dense1(X))
+        X = F.relu(self.dense2(X))
+        X = F.relu(self.dense3(X))
+        X = F.softmax(self.output(X), dim=-1)
+        return X
+
+
 
 
 class LDA_classifier:
@@ -75,7 +108,6 @@ def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_e
     return get_base_config(xgb.sklearn.XGBClassifier, model_params, name=name)
 
 
-
 def get_baseline_cv_configs():
     configs = dict()
     # configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":1500, "per_run_time_limit":300,
@@ -107,10 +139,26 @@ def get_baseline_cv_configs():
     # configs["LDA-50"] = get_base_config(model_fn=LDA_classifier,
     #                                     model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
     #                                                   "n_components": 50})
+    p_iters = {
+        'lr': [0.01, 0.1],
+        'module__num_units1': [200, 100],
+        'module__num_units2': [100, 75],
+        'module__num_units3': [75, 50]}
+    net = NeuralNetClassifier(DeepEHR,max_epochs=20, lr=0.1, iterator_train__shuffle=True)
+    configs["net"] = get_base_config(model_fn=GridSearchCV, model_params={"estimator": net, "param_grid": p_iters, "refit":True, "cv":3})
+    configs["net"]["do cv"] = False
+    # net = NeuralNetClassifier(
+    #     DeepEHR,
+    #     max_epochs=10,
+    #     lr=0.1,
+    #     module__num_units=100,
+    #     # Shuffle training data on each epoch
+    #     iterator_train__shuffle=True,
+    # )
+    # configs["net100"] = net
 
 
-
-    configs["gb"] = get_base_config()
+    #configs["gb"] = get_base_config()
     #configs["knn-25"] = get_base_config(model_fn=KNeighborsClassifier,
     #                                                  model_params={"n_neighbors": 25})
     #configs["knn-50"] = get_base_config(model_fn=KNeighborsClassifier,model_params={"n_neighbors": 50, "n_jobs":-1 })
@@ -120,62 +168,62 @@ def get_baseline_cv_configs():
     #configs["knn-500"] = get_base_config(model_fn=KNeighborsClassifier, model_params={"n_neighbors": 500})
     #configs["knn-1000"] = get_base_config(model_fn=KNeighborsClassifier, model_params={"n_neighbors": 1000})
     #configs["knn-2000"] = get_base_config(model_fn=KNeighborsClassifier, model_params={"n_neighbors": 2000})
-    configs["nb"] = get_base_config(model_fn=BernoulliNB)
+    # configs["nb"] = get_base_config(model_fn=BernoulliNB)
     #configs["nb-Compliment"] = get_base_config(model_fn=ComplementNB)
     #configs["nb-Multi"] = get_base_config(model_fn=MultinomialNB)
     #configs["random stratified"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "stratified"})
     #configs["random uniform"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "uniform"})
-    configs["rf"] = get_rf_baseline_config()
+    # configs["rf"] = get_rf_baseline_config()
 
-    p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
-    objectives = ["binary:logistic"]
-    ns = [250, 400]
-    sample_type = ["uniform", "weighted"]
-    alphas = [0, 0.5, 1]
-    lambdas = [0, 0.5, 1]
-    feature_selector = ["cyclic", "shuffle"]
-    maxes = [8]
-    boosters = ["gbtree", "dart", "gblinear"]
-    trees = ["auto", "hist"]
-    scale_pos_weights = [1, 5, 10]
-    for o in objectives:
-        for n in ns:
-            for m in maxes:
-                for b in boosters:
-                        p2 = p.copy()
-                        p2["n_estimators"] = n
-                        p2["booster"] = b
-                        p2["max_depth"] = m
-                        p2["objective"] = o
-                        if b == "gbtree":
-                            for s in scale_pos_weights:
-                                p2["scale_pos_weight"] = s
-                                for a in alphas:
-                                    p2["alpha"] = a
-                                    for l in lambdas:
-                                        p2["lambda"] = l
-                                        if l != a:
-                                            for t1 in trees:
-                                                p2["tree_method"] = t1
-                                                configs[("xgboost",n, o,b, t1, s, a, l)] = get_xgboost_baseline_config(model_params=p2.copy())
-                        elif b == "dart":
-                            for st in sample_type:
-                                p2["sample_type"] = st
-                                configs[("xgboost",n, o, b, st)] = get_xgboost_baseline_config(
-                                    model_params=p2.copy())
-                        elif b == "gblinear":
-                            for fs in feature_selector:
-                                p2["feature_selector"] = fs
-                                for a in alphas:
-                                    p2["alpha"] = a
-                                    for l in lambdas:
-                                        p2["lambda"] = l
-                                        if l != a:
-                                            configs[("xgboost",n, o, b, fs, a, l)] = get_xgboost_baseline_config(
-                                                model_params=p2.copy())
-                        else:
-                            configs[("xgboost",n, o, b)] = get_xgboost_baseline_config(
-                                model_params=p2)
+    # p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
+    # objectives = ["binary:logistic"]
+    # ns = [250, 400]
+    # sample_type = ["uniform", "weighted"]
+    # alphas = [0, 0.5, 1]
+    # lambdas = [0, 0.5, 1]
+    # feature_selector = ["cyclic", "shuffle"]
+    # maxes = [8]
+    # boosters = ["gbtree", "dart", "gblinear"]
+    # trees = ["auto", "hist"]
+    # scale_pos_weights = [1, 5, 10]
+    # for o in objectives:
+    #     for n in ns:
+    #         for m in maxes:
+    #             for b in boosters:
+    #                     p2 = p.copy()
+    #                     p2["n_estimators"] = n
+    #                     p2["booster"] = b
+    #                     p2["max_depth"] = m
+    #                     p2["objective"] = o
+    #                     if b == "gbtree":
+    #                         for s in scale_pos_weights:
+    #                             p2["scale_pos_weight"] = s
+    #                             for a in alphas:
+    #                                 p2["alpha"] = a
+    #                                 for l in lambdas:
+    #                                     p2["lambda"] = l
+    #                                     if l != a:
+    #                                         for t1 in trees:
+    #                                             p2["tree_method"] = t1
+    #                                             configs[("xgboost",n, o,b, t1, s, a, l)] = get_xgboost_baseline_config(model_params=p2.copy())
+    #                     elif b == "dart":
+    #                         for st in sample_type:
+    #                             p2["sample_type"] = st
+    #                             configs[("xgboost",n, o, b, st)] = get_xgboost_baseline_config(
+    #                                 model_params=p2.copy())
+    #                     elif b == "gblinear":
+    #                         for fs in feature_selector:
+    #                             p2["feature_selector"] = fs
+    #                             for a in alphas:
+    #                                 p2["alpha"] = a
+    #                                 for l in lambdas:
+    #                                     p2["lambda"] = l
+    #                                     if l != a:
+    #                                         configs[("xgboost",n, o, b, fs, a, l)] = get_xgboost_baseline_config(
+    #                                             model_params=p2.copy())
+    #                     else:
+    #                         configs[("xgboost",n, o, b)] = get_xgboost_baseline_config(
+    #                             model_params=p2)
     print("Models #: " + str(len(configs)))
     return configs
 

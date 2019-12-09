@@ -12,6 +12,13 @@ import scipy.sparse as sp
 import itertools as it
 import datetime
 import time
+import torch
+from sklearn.datasets import make_classification
+from torch import nn
+import torch.nn.functional as F
+from sklearn.model_selection import GridSearchCV
+from skorch import NeuralNetClassifier
+import skorch
 from autosklearn import classification as ask
 if os.path.basename(os.getcwd()) != "app":
     os.chdir(os.getcwd() +'/app')
@@ -181,13 +188,21 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
             date_lag = config["date lag"]
         data_sp, labels_translated = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key, date_lag=date_lag)
         p_ids_translated = list(labels_translated.keys())
-        p = config["model"].predict_proba(data_sp)
+        if isinstance(config["model"], NeuralNetClassifier):
+            p = config["model"].predict_proba(data_sp.astype(np.float32))
+        else:
+            p = config["model"].predict_proba(data_sp)
         p, new_pids = get_grouped_preds(p, p_ids_translated, uids_records, p_ids=list(p_ids.keys()), date_lag=date_lag)
         keys_iter = pd.Series(new_pids, name="person_id")
 
     elif split_key=="id":
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key)
-        p = config["model"].predict_proba(data_sp)
+        if isinstance(config["model"], NeuralNetClassifier):
+            p = config["model"].predict_proba(data_sp.astype(np.float32))
+        else:
+            p = config["model"].predict_proba(data_sp)
+
+        #p = config["model"].predict_proba(data_sp)
         keys_iter = pd.Series(list(p_ids.keys()), name="person_id")
 
     data = None
@@ -245,7 +260,17 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual,
                                                            config_base, key=split_key)
         config_select = config_base
-        config_select["model"].fit(data_sp, list(labels_iter.values()))
+
+        if isinstance(config_select["model"], NeuralNetClassifier) or isinstance(config_select["model"], GridSearchCV) :
+            #config_select["model"].dense0 = nn.Linear(data_sp.shape[1], config_select["model"]["sizes"][1])
+            # x_coo = data_sp.tocoo()
+            # x_nn = torch.sparse.FloatTensor(torch.LongTensor([x_coo.row.tolist(), x_coo.col.tolist()]),
+            #                                torch.FloatTensor(x_coo.data.astype(np.float32)))
+            # y_nn = torch.IntTensor(np.array(list(labels_iter.values())))
+            config_select["model"].fit(data_sp.astype(np.float32), np.array(list(labels_iter.values()), dtype=np.int64))
+            #config_select["model"].fit(x_nn, y_nn)
+        else:
+            config_select["model"].fit(data_sp, np.array(list(labels_iter.values())))
         selected = "no CV"
         config_select["date lag"] = date_lags[0]
         perf = {}
@@ -265,10 +290,22 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                     key_c = (key_c, tuple(date_lag))
                     print("(Model, iteration): " + str((key_c, ii)))
                     ttt = time.time()
-                    config["model"].fit(x_train, y_train)
+                    if isinstance(config["model"], NeuralNetClassifier):
+                        x_coo = x_train.tocoo()
+                        x_nn = torch.sparse.BoolTensor(torch.LongTensor([x_coo.row.tolist(), x_coo.col.tolist()]),torch.BoolTensor(x_coo.data.astype(np.bool)))
+                        y_nn = torch.BoolTensor(y_train)
+                        config["model"].fit(x_nn, y_nn)
+                    else:
+                        config["model"].fit(x_train, y_train)
                     print("CV Train: " + str(time.time() - ttt))
                     ttt = time.time()
-                    y_pred = config["model"].predict_proba(x_test)
+                    if isinstance(config["model"], NeuralNetClassifier):
+                        x_coo = x_test.tocoo()
+                        x_nn = torch.sparse.BoolTensor(torch.LongTensor([x_coo.row.tolist(), x_coo.col.tolist()]),torch.BoolTensor(x_coo.data.astype(np.bool)))
+                        y_pred = config["model"].predict_proba(x_nn)
+                    else:
+                        y_pred = config["model"].predict_proba(x_test)
+
                     print("CV Predict: " + str(time.time() - ttt) )
                     if split_key == "dates":
                         y_pred, p_ids = get_grouped_preds(y_pred, keys_test, uids_records, p_ids=None, date_lag=date_lag)
