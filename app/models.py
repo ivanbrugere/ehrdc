@@ -197,7 +197,7 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
 
     elif split_key=="id":
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key)
-        if isinstance(config["model"], NeuralNetClassifier):
+        if isinstance(config["model"], NeuralNetClassifier) or isinstance(config["model"], GridSearchCV):
             p = config["model"].predict_proba(data_sp.astype(np.float32))
         else:
             p = config["model"].predict_proba(data_sp)
@@ -260,15 +260,10 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual,
                                                            config_base, key=split_key)
         config_select = config_base
-
         if isinstance(config_select["model"], NeuralNetClassifier) or isinstance(config_select["model"], GridSearchCV) :
-            #config_select["model"].dense0 = nn.Linear(data_sp.shape[1], config_select["model"]["sizes"][1])
-            # x_coo = data_sp.tocoo()
-            # x_nn = torch.sparse.FloatTensor(torch.LongTensor([x_coo.row.tolist(), x_coo.col.tolist()]),
-            #                                torch.FloatTensor(x_coo.data.astype(np.float32)))
-            # y_nn = torch.IntTensor(np.array(list(labels_iter.values())))
+            config_select["model"].param_grid["module__input_size"] = [data_sp.shape[1]]
+
             config_select["model"].fit(data_sp.astype(np.float32), np.array(list(labels_iter.values()), dtype=np.int64))
-            #config_select["model"].fit(x_nn, y_nn)
         else:
             config_select["model"].fit(data_sp, np.array(list(labels_iter.values())))
         selected = "no CV"

@@ -140,12 +140,12 @@ def get_baseline_cv_configs():
     #                                     model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
     #                                                   "n_components": 50})
     p_iters = {
-        'lr': [0.01, 0.1],
+        'lr': [0.1],
         'module__num_units1': [200, 100],
         'module__num_units2': [100, 75],
         'module__num_units3': [75, 50]}
-    net = NeuralNetClassifier(DeepEHR,max_epochs=20, lr=0.1, iterator_train__shuffle=True)
-    configs["net"] = get_base_config(model_fn=GridSearchCV, model_params={"estimator": net, "param_grid": p_iters, "refit":True, "cv":3})
+    net = NeuralNetClassifier(DeepEHR,max_epochs=8, lr=0.1, iterator_train__shuffle=True)
+    configs["net"] = get_base_config(model_fn=GridSearchCV, model_params={"estimator": net, "param_grid": p_iters, "refit":True, "cv":1, "scoring": "roc_auc"})
     configs["net"]["do cv"] = False
     # net = NeuralNetClassifier(
     #     DeepEHR,
@@ -156,7 +156,7 @@ def get_baseline_cv_configs():
     #     iterator_train__shuffle=True,
     # )
     # configs["net100"] = net
-
+    #here
 
     #configs["gb"] = get_base_config()
     #configs["knn-25"] = get_base_config(model_fn=KNeighborsClassifier,
