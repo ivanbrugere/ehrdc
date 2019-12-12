@@ -21,24 +21,29 @@ os.environ["OMP_NUM_THREADS"] = "8"
 
 
 class DeepEHR(nn.Module):
-    def __init__(self, input_size=6369, num_units1=100, num_units2=50,num_units3=25, nonlinear=F.relu):
+    def __init__(self, input_size=6369, num_units1=100, num_units2=50,num_units3=25, num_units4=0, output_size=2, nonlinear=F.relu, dropout=0.5):
         super(DeepEHR, self).__init__()
-
+        self.sizes = [input_size, num_units1, num_units2, num_units3, num_units4]
         self.dense0 = nn.Linear(input_size, num_units1)
         self.nonlinear = nonlinear
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(dropout)
         self.dense1 = nn.Linear(num_units1, num_units2)
         self.dense2 = nn.Linear(num_units2, num_units3)
-        self.dense3 = nn.Linear(num_units3, 10)
-        self.output = nn.Linear(10, 2)
-        self.sizes = [input_size, num_units1, num_units2, num_units3]
+        if num_units3 and num_units4:
+            self.dense3 = nn.Linear(num_units3, num_units4)
+        else:
+            self.dense3 = None
+        self.output = nn.Linear([i for i in self.sizes if i != 0][-1], output_size)
 
     def forward(self, X, **kwargs):
         X = self.nonlinear(self.dense0(X))
         X = self.dropout(X)
         X = F.relu(self.dense1(X))
+        X = self.dropout(X)
         X = F.relu(self.dense2(X))
-        X = F.relu(self.dense3(X))
+        X = self.dropout(X)
+        if self.dense3 is not None:
+            X = F.relu(self.dense3(X))
         X = F.softmax(self.output(X), dim=-1)
         return X
 
@@ -110,7 +115,7 @@ def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_e
 
 def get_baseline_cv_configs():
     configs = dict()
-    # configs["auto"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":1500, "per_run_time_limit":300,
+    # configs["aut10o"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":1500, "per_run_time_limit":300,
     #                                              "n_jobs":8,
     #                                              "ensemble_size":3, "ensemble_nbest":20, "ml_memory_limit":30000})
     #
@@ -141,11 +146,13 @@ def get_baseline_cv_configs():
     #                                                   "n_components": 50})
     p_iters = {
         'lr': [0.1],
-        'module__num_units1': [200, 100],
+        'module__dropout': [0.5],
+        'module__num_units1': [400],
         'module__num_units2': [100, 75],
-        'module__num_units3': [75, 50]}
+        'module__num_units3': [50, 25],
+        'module__num_units4': [20, 10, 0]}
     net = NeuralNetClassifier(DeepEHR,max_epochs=8, lr=0.1, iterator_train__shuffle=True)
-    configs["net"] = get_base_config(model_fn=GridSearchCV, model_params={"estimator": net, "param_grid": p_iters, "refit":True, "cv":1, "scoring": "roc_auc"})
+    configs["net"] = get_base_config(model_fn=GridSearchCV, model_params={"estimator": net, "param_grid": p_iters, "refit":True, "cv":2, "scoring": "roc_auc"})
     configs["net"]["do cv"] = False
     # net = NeuralNetClassifier(
     #     DeepEHR,
