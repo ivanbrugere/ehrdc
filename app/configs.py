@@ -151,36 +151,58 @@ def get_baseline_cv_configs():
     #                                                   "n_components": 50})
     nnets = {}
     p3 = {
-        'lr': 0.05,
+        'lr': 0.1,
+        'batch_size': 1024,
         'module__dropout': 0.2,
-        'module__num_units1': 500,
-        'module__num_units2': 100,
+        'module__num_units1': 200,
+        'module__num_units2': 50,
         'module__num_units3': 50,
-        'module__num_units4': 0,
-        'max_epochs':50,
+        'module__num_units4': 25,
+        'max_epochs':100,
+        'train_split': skorch.dataset.CVSplit(.3, stratified=True),
         'iterator_train__shuffle':True,
-        'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=3, threshold=0.001, threshold_mode='rel',
+        'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
                                    lower_is_better=True)]}
 
-    configs["3layer-relu"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
-    nnets["3layer-relu"]=configs["3layer-relu"]["model"]
+    configs["4layer-relu"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
+    nnets["4layer-relu"]=configs["4layer-relu"]["model"]
 
-    p4 = {
-        'lr': 0.05,
-        'module__dropout': 0.2,
-        'module__num_units1': 500,
-        'module__num_units2': 100,
-        'module__num_units3': 50,
-        'module__num_units4': 0,
-        'max_epochs':50,
-        'module__nonlinear': F.leaky_relu,
-        'iterator_train__shuffle':True,
-        'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=3, threshold=0.001, threshold_mode='rel',
-                                           lower_is_better=True)]
-    }
 
-    configs["3layer-leaky"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p4})
-    nnets["3layer-leaky"]=configs["3layer-leaky"]["model"]
+    # nnets = {}
+    # p3 = {
+    #     'lr': 0.1,
+    #     'batch_size': 1024,
+    #     'module__dropout': 0.5,
+    #     'module__num_units1': 200,
+    #     'module__num_units2': 50,
+    #     'module__num_units3': 50,
+    #     'module__num_units4': 25,
+    #     'max_epochs':100,
+    #     'train_split': skorch.dataset.CVSplit(.3, stratified=True),
+    #     'iterator_train__shuffle':True,
+    #     'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=3, threshold=0.0001, threshold_mode='rel',
+    #                                lower_is_better=True)]}
+    #
+    # configs["4layer-relu-do"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
+    # nnets["4layer-relu-do"]=configs["4layer-relu-do"]["model"]
+    # p4 = {
+    #     'lr': 0.1,
+    #     'batch_size':1024,
+    #     'module__dropout': 0.2,
+    #     'module__num_units1': 500,
+    #     'module__num_units2': 100,
+    #     'module__num_units3': 50,
+    #     'module__num_units4': 0,
+    #     'max_epochs':50,
+    #     'module__nonlinear': F.leaky_relu,
+    #     'iterator_train__shuffle':True,
+    #     'train_split': skorch.dataset.CVSplit(.3, stratified=True),
+    #     'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=3, threshold=0.0001, threshold_mode='rel',
+    #                                        lower_is_better=True)]
+    # }
+    #
+    # configs["3layer-leaky"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p4})
+    # nnets["3layer-leaky"]=configs["3layer-leaky"]["model"]
 
 
     # net = NeuralNetClassifier(
@@ -221,7 +243,7 @@ def get_baseline_cv_configs():
     maxes = [8]
     boosters = ["gbtree", "gblinear"]
     trees = ["auto", "hist"]
-    scale_pos_weights = [1, 5, 10]
+    scale_pos_weights = [1, 5, 10, 20]
     for o in objectives:
         for n in ns:
             for m in maxes:

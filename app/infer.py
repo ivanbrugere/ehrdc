@@ -37,3 +37,4 @@ elif config["model name"] == "static uid model selection":
         p = model_includes.model_sparse_feature_test(data, config, uids=uids)
     p.to_csv(config_paths["output path"] + "predictions.csv")
 print("total time:" + str(time.time()-t))
+

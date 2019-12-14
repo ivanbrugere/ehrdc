@@ -355,12 +355,12 @@ def evaluate_paired_model(config_select, data_sp, y_label=None, train=False, x_a
             y_net_pred = vm.predict_proba(data_sp)[:, 1]
             x_apps.append(sp.csr_matrix((y_net_pred, (range(len(y_net_pred)), np.zeros(len(y_net_pred)))),
                                   shape=(len(y_net_pred), 1)))
-    data_sp = sp.hstack([data_sp] + x_apps).tocsr()
+    data_sp_iter = sp.hstack([data_sp] + x_apps).tocsr()
     if train:
-        config_select["model"]["pred"].fit(data_sp, y_label)
+        config_select["model"]["pred"].fit(data_sp_iter, y_label)
         return x_apps
     else:
-        return config_select["model"]["pred"].predict_proba(data_sp), x_apps
+        return config_select["model"]["pred"].predict_proba(data_sp_iter), x_apps
 
 def train_nn(vm, data_sp, y_label):
     if (not hasattr(vm, "module_")) or vm.module_.training:
@@ -368,8 +368,8 @@ def train_nn(vm, data_sp, y_label):
         vm.module__input_size = s
         vm.fit(data_sp, y_label)
 
-def train_paired_model(config_select, data_sp, y_label):
-    return evaluate_paired_model(config_select, data_sp, y_label=y_label, train=True)
+def train_paired_model(config_select, data_sp, y_label, x_apps=[]):
+    return evaluate_paired_model(config_select, data_sp, y_label=y_label, train=True, x_apps=x_apps)
 
 def reset_paired_model(config_select):
     if isinstance(config_select["model"], dict) and "nets" in config_select["model"]:
@@ -437,3 +437,12 @@ def get_default_join(config, key="visits"):
         return config[key]
 
 
+def clear_all():
+    """Clears all the variables from the workspace of the spyder application."""
+    gl = globals().copy()
+    for var in gl:
+        if var[0] == '_': continue
+        if 'func' in str(globals()[var]): continue
+        if 'module' in str(globals()[var]): continue
+
+    del globals()[var]
