@@ -16,7 +16,9 @@ import joblib as jl
 from app import models as model_includes
 from app import configs as model_configs
 import time
-
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 
 t = time.time()
 config_paths = model_configs.get_base_config()

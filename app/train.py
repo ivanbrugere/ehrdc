@@ -15,11 +15,14 @@ import joblib as jl
 import app.models as model_includes
 import app.configs as model_configs
 
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
 t = time.time()
 split_key = "id"
 configs = model_configs.get_baseline_cv_configs()
 config = list(configs.values())[0]
-
+load_only=False
 tt = time.time()
 data = model_includes.read_ehrdc_data(config["train path"])
 print("Data load time:" + str(time.time()-tt))
@@ -30,9 +33,13 @@ if "train" in config and config["train"]:
         jl.dump(config_trained, config["model path"] + "config.joblib")
     elif config["model name"] == "static uid model selection":
         configs = model_configs.get_baseline_cv_configs()
-        config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, split_key=split_key)
-        print("Selected: " + str(selected))
-        print(perf)
-        jl.dump(config_select, config["model path"] + "config.joblib")
-        jl.dump(uids, config["scratch path"] + "uids.joblib")
+        if load_only:
+            x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs, split_key="id")
+        else:
+            config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, split_key=split_key)
+            print("Selected: " + str(selected))
+            print(perf)
+            jl.dump(config_select, config["model path"] + "config.joblib")
+            jl.dump(uids, config["scratch path"] + "uids.joblib")
 print("Total time:" + str(time.time()-t))
+
