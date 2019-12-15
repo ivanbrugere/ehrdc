@@ -17,7 +17,6 @@ from sklearn.datasets import make_classification
 from torch import nn
 import torch.nn.functional as F
 from sklearn.model_selection import GridSearchCV
-from skorch import NeuralNetClassifier
 import skorch
 #from autosklearn import classification as ask
 if os.path.basename(os.getcwd()) != "app":
@@ -188,7 +187,7 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
             date_lag = config["date lag"]
         data_sp, labels_translated = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key, date_lag=date_lag)
         p_ids_translated = list(labels_translated.keys())
-        if isinstance(config["model"], NeuralNetClassifier):
+        if isinstance(config["model"], model_configs.NNC):
             p = config["model"].predict_proba(data_sp.astype(np.float32))
         else:
             p = config["model"].predict_proba(data_sp)
@@ -281,7 +280,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual,
                                                            config_base, key=split_key)
         config_select = config_base
-        if isinstance(config_select["model"], NeuralNetClassifier) or isinstance(config_select["model"], GridSearchCV):
+        if isinstance(config_select["model"], model_configs.NNC) or isinstance(config_select["model"], GridSearchCV):
             config_select["model"].param_grid["module__input_size"] = [data_sp.shape[1]]
 
             config_select["model"].fit(data_sp, np.array(list(labels_iter.values()), dtype=np.int64))
@@ -305,7 +304,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                 print("CV Test data: " + str((x_test.shape, x_test.nnz, x_test.dtype)))
                 #print(keys_train)
                 for key_c, config in configs.items():
-                    reset_paired_model(config)
+                    reset_net_model(config)
                 x_apps_train = []
                 x_apps_val = []
                 for key_c, config in configs.items():
@@ -316,7 +315,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                     ttt = time.time()
                     if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
                         x_apps_train = train_paired_model(config, x_train, np.array(y_train), x_apps_train)
-                    elif isinstance(config["model"], NeuralNetClassifier):
+                    elif isinstance(config["model"], model_configs.NNC):
                         train_nn(config["model"], x_train, np.array(y_train))
                     else:
                         config["model"].fit(x_train, np.array(y_train))
@@ -326,30 +325,38 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                     ttt = time.time()
                     if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
                         y_pred, x_apps_val = evaluate_paired_model(config, x_test, x_apps_val)
+                    elif (isinstance(config["model"], model_configs.PairedKnn) or isinstance(config["model"], model_configs.PairedPipeline)) and isinstance(config["model"].f_rep, model_configs.NNC) and hasattr(config["model"].f_rep, "module_"):
+                        if config["model"].f_rep.module_.cache is not None:
+                            inds_iter = config["model"].f_rep.module_.cache
+                        else:
+                            inds_iter = None
+                        if config["model"].f_rep.module_.cache_rep is not None:
+                            x_rep_iter = config["model"].f_rep.module_.cache_rep
+                        else:
+                            x_rep_iter = None
+                        y_pred = config["model"].predict_proba(x_test, inds=inds_iter, x_test_t=x_rep_iter)
                     else:
                         y_pred = config["model"].predict_proba(x_test)
-
                     print("CV Predict: " + str(time.time() - ttt) )
                     if split_key == "dates":
                         y_pred, p_ids = get_grouped_preds(y_pred, keys_test, uids_records, p_ids=None, date_lag=date_lag)
                         y_test = [int(labels_back[k]) for k in p_ids]
                     print("CV Metrics")
                     metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred[:, 1]))
-                    #print(y_pred)
-        perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
-        selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
-        config_select = configs[selected[0]]
-        config_select["date lag"] = selected[1]
-        print("Selected: " + str(selected))
-        print(perf)
-        print("Training full selected model")
-        reset_paired_model(config_select)
-        if isinstance(config_select["model"], dict) and "nets" in config_select["model"] and "pred" in config_select["model"]:
-            train_paired_model(config_select, data_sp, np.array(list(labels_store[selected[1]].values())))
-        elif isinstance(config_select["model"], NeuralNetClassifier):
-            train_nn(config_select["model"], data_sp, np.array(list(labels_store[selected[1]].values())))
-        else:
-            config_select["model"].fit(data_sp, list(labels_store[selected[1]].values()))
+            perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
+            selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
+            config_select = configs[selected[0]]
+            config_select["date lag"] = selected[1]
+            print("Selected: " + str(selected))
+            print(perf)
+            print("Training full selected model")
+            reset_net_model(config_select)
+            if isinstance(config_select["model"], dict) and "nets" in config_select["model"] and "pred" in config_select["model"]:
+                train_paired_model(config_select, data_sp, np.array(list(labels_store[selected[1]].values())))
+            elif isinstance(config_select["model"], model_configs.NNC):
+                train_nn(config_select["model"], data_sp, np.array(list(labels_store[selected[1]].values())))
+            else:
+                config_select["model"].fit(data_sp, list(labels_store[selected[1]].values()))
 
     config_select["train shape"] = data_sp.shape
     print("Model cv time: " + str(time.time() - tt))
@@ -377,11 +384,14 @@ def train_nn(vm, data_sp, y_label):
 def train_paired_model(config_select, data_sp, y_label, x_apps=[]):
     return evaluate_paired_model(config_select, data_sp, y_label=y_label, train=True, x_apps=x_apps)
 
-def reset_paired_model(config_select):
+def reset_net_model(config_select):
     if isinstance(config_select["model"], dict) and "nets" in config_select["model"]:
         for k, vm in config_select["model"]["nets"].items():
-            if hasattr(vm, "module_"):
-                delattr(vm, "module_")
+            vm.reset()
+    elif isinstance(config_select["model"], model_configs.NNC):
+        config_select["model"].reset()
+    elif isinstance(config_select["model"], model_configs.PairedKnn) or isinstance(config_select["model"], model_configs.PairedPipeline):
+        config_select["model"].reset()
 
 def empirical_risk(person_feats, labels, th = 20):
     d = c.defaultdict(lambda: [0,0])

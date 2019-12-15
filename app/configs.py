@@ -21,6 +21,12 @@ import app.models as model_includes
 os.environ["OMP_NUM_THREADS"] = "8"
 
 
+class NNC(NeuralNetClassifier):
+    def reset(self):
+        if hasattr(self, "module_"):
+            delattr(self, "module_")
+
+
 class DeepEHR(nn.Module):
     def __init__(self, input_size=6369, num_units1=100, num_units2=50,num_units3=25, num_units4=0, output_size=2, nonlinear=F.relu, dropout=0.5):
         super(DeepEHR, self).__init__()
@@ -31,6 +37,8 @@ class DeepEHR(nn.Module):
         self.dense1 = nn.Linear(num_units1, num_units2)
         self.dense2 = nn.Linear(num_units2, num_units3)
         self.train_preds =None
+        self.cache = None
+        self.cache_rep=None
         if num_units3 and num_units4:
             self.dense3 = nn.Linear(num_units3, num_units4)
         else:
@@ -50,6 +58,7 @@ class DeepEHR(nn.Module):
             return X
         else:
             return F.softmax(self.output(X), dim=-1)
+
 
 
 
@@ -89,14 +98,21 @@ class PairedKnn:
         self.n_max = n_max
         self.leaf_size = leaf_size
         self.metric = metric
+
+    def reset(self):
+        if isinstance(self.f_rep, NNC):
+            self.f_rep.reset()
+        if isinstance(self.f_pred, NNC):
+            self.f_pred.reset()
+
     def fit(self, x_train, y_train):
-        if isinstance(self.f_rep, NeuralNetClassifier):
+        if isinstance(self.f_rep, NNC):
             model_includes.train_nn(self.f_rep, x_train, y_train)
             self.x_train_t = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
         else:
             self.x_train_t = self.f_rep(x_train)
 
-        if isinstance(self.f_pred, NeuralNetClassifier):
+        if isinstance(self.f_pred, NNC):
             model_includes.train_nn(self.f_pred, x_train, y_train)
         else:
             self.f_pred.fit(x_train, y_train)
@@ -106,12 +122,21 @@ class PairedKnn:
         self.knn_index = sk.neighbors.NearestNeighbors(n_jobs=-1, leaf_size=self.leaf_size, n_neighbors=self.n_max, metric=self.metric)
         self.knn_index.fit(self.x_train_t)
 
-    def predict_proba(self, x_test):
-        if isinstance(self.f_rep, NeuralNetClassifier):
-            x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+    def predict_proba(self, x_test, inds=None, x_test_t=None):
+        if isinstance(self.f_rep, NNC):
+            if x_test_t is None:
+                x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+                print("Computed Representation")
         else:
             x_test_t= self.f_rep(x_test)
-        dists, inds = self.knn_index.kneighbors(x_test_t)
+        if inds is None or (self.f_rep.module_.cache is not None and self.n_max > self.f_rep.module_.cache.shape[1]):
+            dists, inds = self.knn_index.kneighbors(x_test_t)
+            print("Computed KNN")
+        if isinstance(self.f_rep, NNC):
+            if self.f_rep.module_.cache_rep is None:
+                self.f_rep.module_.cache_rep = x_test_t
+            if (self.f_rep.module_.cache is not None and inds.shape[1] > self.f_rep.module_.cache.shape[1]) or (self.f_rep.module_.cache is None):
+                self.f_rep.module_.cache = inds
         r1 = []
         r2 = []
         for vi in inds:
@@ -120,33 +145,47 @@ class PairedKnn:
         ret = np.column_stack((r1, r2))
         return ret
 
+
 class PairedPipeline:
     def __init__(self, f_rep, f_pred):
         self.f_rep = f_rep
         self.f_pred = f_pred
 
     def fit(self, x_train, y_train):
-        if isinstance(self.f_rep, NeuralNetClassifier):
+        if isinstance(self.f_rep, NNC):
             model_includes.train_nn(self.f_rep, x_train, y_train)
             x_train_t = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
         else:
             x_train_t = self.f_rep(x_train)
 
-        if isinstance(self.f_pred, NeuralNetClassifier):
+        if isinstance(self.f_pred, NNC):
             model_includes.train_nn(self.f_pred, x_train_t, y_train)
         else:
             self.f_pred.fit(x_train_t, y_train)
 
-    def predict_proba(self, x_test):
-        if isinstance(self.f_rep, NeuralNetClassifier):
-            x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+    def reset(self):
+        if isinstance(self.f_rep, NNC):
+            self.f_rep.reset()
+        if isinstance(self.f_pred, NNC):
+            self.f_pred.reset()
+
+    def predict_proba(self, x_test, inds=None, x_test_t=None):
+        if isinstance(self.f_rep, NNC):
+            if x_test_t is None:
+                x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+                print("Computed Representation")
         else:
             x_test_t= self.f_rep(x_test)
-
+        if isinstance(self.f_rep, NNC):
+            if self.f_rep.module_.cache_rep is None:
+                self.f_rep.module_.cache_rep = x_test_t
         return self.f_pred.predict_proba(x_test_t)
+
 
 def dummy_ret(x):
     return x
+
+
 def get_base_config(model_fn=None, model_params={}, name=None):
     config = {}
     if name is None:
@@ -160,8 +199,8 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = "../train_newest/"
-    config["test path"] = "../infer_newest/"
+    config["train path"] = "../train/"
+    config["test path"] = "../infer/"
     config["model path"] = "../model/"
     config["output path"] = "../output/"
     config["scratch path"] = "../scratch/"
@@ -174,13 +213,16 @@ def get_base_config(model_fn=None, model_params={}, name=None):
     config["cv split key"] = "id"
     return config
 
+
 def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200,"n_jobs":-1}, name=None):
     config = get_base_config(RandomForestClassifier, model_params, name=name)
     return config
 
+
 def get_naivebayes_baseline_config(model_params={}, name=None):
     config = get_base_config(BernoulliNB, model_params, name=name)
     return config
+
 
 def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_estimators":100}, name=None):
     return get_base_config(xgb.sklearn.XGBClassifier, model_params, name=name)
@@ -219,8 +261,9 @@ def get_baseline_cv_configs():
     #
     #
     #                                                   "n_components": 50})
-    paired_ks = [5, 10]
+    paired_ks = [20, 10, 5]
     nnets = {}
+    m_epochs = 200
     p3 = {
         'lr': 0.1,
         'batch_size': 1024,
@@ -228,13 +271,13 @@ def get_baseline_cv_configs():
         'module__num_units1': 100,
         'module__num_units2': 100,
         'module__num_units3': 50,
-        'max_epochs':100,
+        'max_epochs':m_epochs,
         'train_split': skorch.dataset.CVSplit(.3, stratified=True),
         'iterator_train__shuffle':True,
         'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
                                    lower_is_better=True)]}
 
-    configs["3layer-50"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
+    configs["3layer-50"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p3})
     nnets["3layer-50"]=configs["3layer-50"]["model"]
 
     p3 = {
@@ -245,13 +288,13 @@ def get_baseline_cv_configs():
         'module__num_units2': 100,
         'module__num_units3': 25,
         'module__num_units4': 0,
-        'max_epochs':100,
+        'max_epochs':m_epochs,
         'train_split': skorch.dataset.CVSplit(.3, stratified=True),
         'iterator_train__shuffle':True,
         'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
                                    lower_is_better=True)]}
 
-    configs["3layer"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
+    configs["3layer"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p3})
     nnets["3layer"]=configs["3layer"]["model"]
 
     for k in paired_ks:
@@ -276,7 +319,7 @@ def get_baseline_cv_configs():
     #     'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=3, threshold=0.0001, threshold_mode='rel',
     #                                lower_is_better=True)]}
     #
-    # configs["3layer-50-do"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
+    # configs["3layer-50-do"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p3})
     # nnets["3layer-50-do"]=configs["3layer-50-do"]["model"]
     # p4 = {
     #     'lr': 0.1,
@@ -294,11 +337,11 @@ def get_baseline_cv_configs():
     #                                        lower_is_better=True)]
     # }
     #
-    # configs["3layer-leaky"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p4})
+    # configs["3layer-leaky"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p4})
     # nnets["3layer-leaky"]=configs["3layer-leaky"]["model"]
 
 
-    # net = NeuralNetClassifier(
+    # net = NNC(
     #     DeepEHR,
     #     max_epochs=10,
     #     lr=0.1,
@@ -334,7 +377,7 @@ def get_baseline_cv_configs():
     lambdas = [1]
     feature_selector = ["cyclic", "shuffle"]
     maxes = [8]
-    boosters = ["gbtree", "gblinear"]
+    boosters = ["gbtree", "gblinear", "dart"]
     trees = ["auto"]
     scale_pos_weights = [1]
     for o in objectives:
@@ -364,8 +407,9 @@ def get_baseline_cv_configs():
                         elif b == "dart":
                             for st in sample_type:
                                 p2["sample_type"] = st
-                                configs[("xgboost",n, o, b, st)] = get_xgboost_baseline_config(
-                                    model_params=p2.copy())
+                                mm = get_xgboost_baseline_config(model_params=p2.copy())
+                                configs[("xgboost", n, o, b, st)] = mm
+                                model_xgbs[("xgboost", n, o, b, st)] = mm
                         elif b == "gblinear":
                             for fs in feature_selector:
                                 p2["feature_selector"] = fs
@@ -377,7 +421,7 @@ def get_baseline_cv_configs():
                                             mm = get_xgboost_baseline_config(model_params=p2.copy())
                                             ##mm["model"] = {"nets": nnets, "pred":mm["model"]}
                                             configs[("xgboost",n, o, b, fs, a, l)] = mm
-                                            model_xgbs[("xgboost", n, o, b, t1, s, a, l)] = mm
+                                            model_xgbs[("xgboost",n, o, b, fs, a, l)] = mm
                         else:
                             configs[("xgboost",n, o, b)] = get_xgboost_baseline_config(
                                 model_params=p2)
