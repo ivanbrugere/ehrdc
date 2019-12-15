@@ -17,6 +17,7 @@ import torch.nn.functional as F
 from sklearn.model_selection import GridSearchCV
 from skorch import NeuralNetClassifier
 import skorch
+import app.models as model_includes
 os.environ["OMP_NUM_THREADS"] = "8"
 
 
@@ -78,6 +79,48 @@ class LDA_classifier:
         return np.vstack((np.zeros(len(risks)), risks)).transpose()
 
 
+class PairedKnn:
+    def __init__(self, f_rep, f_pred, n_max=30, leaf_size=50,metric="cosine"):
+        self.f_rep = f_rep
+        self.f_pred = f_pred
+        self.x_train_t = None
+        self.x_train_p = None
+        self.knn_index = None
+        self.n_max = n_max
+        self.leaf_size = leaf_size
+        self.metric = metric
+    def fit(self, x_train, y_train):
+        if isinstance(self.f_rep, NeuralNetClassifier):
+            model_includes.train_nn(self.f_rep, x_train, y_train)
+            self.x_train_t = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
+        else:
+            self.x_train_t = self.f_rep(x_train)
+
+        if isinstance(self.f_pred, NeuralNetClassifier):
+            model_includes.train_nn(self.f_pred, x_train, y_train)
+        else:
+            self.f_pred.fit(x_train, y_train)
+
+        self.x_train_p = self.f_pred.predict_proba(x_train)
+
+        self.knn_index = sk.neighbors.NearestNeighbors(n_jobs=-1, leaf_size=self.leaf_size, n_neighbors=self.n_max, metric=self.metric)
+        self.knn_index.fit(self.x_train_t)
+
+    def predict_proba(self, x_test):
+        if isinstance(self.f_rep, NeuralNetClassifier):
+            x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+        else:
+            x_test_t= self.f_rep(x_test)
+        dists, inds = self.knn_index.kneighbors(x_test_t)
+        r1 = []
+        r2 = []
+        for vi in inds:
+            r1.append(np.mean(self.x_train_p[vi[0:self.n_max]][:, 0]))
+            r2.append(np.mean(self.x_train_p[vi[0:self.n_max]][:, 1]))
+        ret = np.column_stack((r1, r2))
+        return ret
+def dummy_ret(x):
+    return x
 def get_base_config(model_fn=None, model_params={}, name=None):
     config = {}
     if name is None:
@@ -148,12 +191,14 @@ def get_baseline_cv_configs():
     # configs["LDA-50"] = get_base_config(model_fn=LDA_classifier,
     #                                     model_params={"learning_method": "online", "batch_size": 1000, "n_jobs": -1,
     #
+    #
     #                                                   "n_components": 50})
+    paired_ks = [5, 10]
     nnets = {}
     p3 = {
         'lr': 0.1,
         'batch_size': 1024,
-        'module__dropout': 0.2,
+        'module__dropout': 0,
         'module__num_units1': 200,
         'module__num_units2': 50,
         'module__num_units3': 50,
@@ -166,6 +211,9 @@ def get_baseline_cv_configs():
 
     configs["4layer-relu"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
     nnets["4layer-relu"]=configs["4layer-relu"]["model"]
+
+    for k in paired_ks:
+        configs[("4layer-relu",k)] = get_base_config(model_fn=PairedKnn, model_params={"f_rep":configs["4layer-relu"]["model"], "f_pred":configs["4layer-relu"]["model"], "n_max":k})
 
 
     # nnets = {}
@@ -232,18 +280,18 @@ def get_baseline_cv_configs():
     #configs["random stratified"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "stratified"})
     #configs["random uniform"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "uniform"})
     # configs["rf"] = get_rf_baseline_config()
-
+    model_xgbs = {}
     p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
     objectives = ["binary:logistic"]
     ns = [300]
-    sample_type = ["uniform", "weighted"]
-    alphas = [0, 0.5, 1]
-    lambdas = [0, 0.5, 1]
+    sample_type = ["weighted"]
+    alphas = [0]
+    lambdas = [1]
     feature_selector = ["cyclic", "shuffle"]
     maxes = [8]
     boosters = ["gbtree", "gblinear"]
-    trees = ["auto", "hist"]
-    scale_pos_weights = [1, 5, 10, 20]
+    trees = ["auto"]
+    scale_pos_weights = [1]
     for o in objectives:
         for n in ns:
             for m in maxes:
@@ -264,8 +312,9 @@ def get_baseline_cv_configs():
                                             for t1 in trees:
                                                 p2["tree_method"] = t1
                                                 mm = get_xgboost_baseline_config(model_params=p2.copy())
-                                                mm["model"] = {"nets":nnets, "pred":mm["model"]}
+                                                #mm["model"] = {"nets":nnets, "pred":mm["model"]}
                                                 configs[("xgboost",n, o,b, t1, s, a, l)] = mm
+                                                model_xgbs[("xgboost",n, o,b, t1, s, a, l)] = mm
 
                         elif b == "dart":
                             for st in sample_type:
@@ -281,12 +330,27 @@ def get_baseline_cv_configs():
                                         p2["lambda"] = l
                                         if l != a:
                                             mm = get_xgboost_baseline_config(model_params=p2.copy())
-                                            mm["model"] = {"nets": nnets, "pred":mm["model"]}
+                                            ##mm["model"] = {"nets": nnets, "pred":mm["model"]}
                                             configs[("xgboost",n, o, b, fs, a, l)] = mm
+                                            model_xgbs[("xgboost", n, o, b, t1, s, a, l)] = mm
                         else:
                             configs[("xgboost",n, o, b)] = get_xgboost_baseline_config(
                                 model_params=p2)
+    for k in paired_ks:
+        for kk, v_model in model_xgbs.items():
+            configs[("4layer-relu", kk, k)] = get_base_config(model_fn=PairedKnn,
+                                                      model_params={"f_rep": configs["4layer-relu"]["model"],
+                                                                    "f_pred": v_model["model"],
+                                                                    "n_max": k})
+            configs[("lambda", kk, k)] = get_base_config(model_fn=PairedKnn,
+                                                      model_params={"f_rep": dummy_ret,
+                                                                    "f_pred": v_model["model"],
+                                                                    "n_max": k})
+
     print("Models #: " + str(len(configs)))
+
+
+
     return configs
 
 
