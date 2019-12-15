@@ -119,6 +119,32 @@ class PairedKnn:
             r2.append(np.mean(self.x_train_p[vi[0:self.n_max]][:, 1]))
         ret = np.column_stack((r1, r2))
         return ret
+
+class PairedPipeline:
+    def __init__(self, f_rep, f_pred):
+        self.f_rep = f_rep
+        self.f_pred = f_pred
+
+    def fit(self, x_train, y_train):
+        if isinstance(self.f_rep, NeuralNetClassifier):
+            model_includes.train_nn(self.f_rep, x_train, y_train)
+            x_train_t = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
+        else:
+            x_train_t = self.f_rep(x_train)
+
+        if isinstance(self.f_pred, NeuralNetClassifier):
+            model_includes.train_nn(self.f_pred, x_train_t, y_train)
+        else:
+            self.f_pred.fit(x_train_t, y_train)
+
+    def predict_proba(self, x_test):
+        if isinstance(self.f_rep, NeuralNetClassifier):
+            x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+        else:
+            x_test_t= self.f_rep(x_test)
+
+        return self.f_pred.predict_proba(x_test_t)
+
 def dummy_ret(x):
     return x
 def get_base_config(model_fn=None, model_params={}, name=None):
@@ -134,8 +160,8 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = "../train/"
-    config["test path"] = "../infer/"
+    config["train path"] = "../train_newest/"
+    config["test path"] = "../infer_newest/"
     config["model path"] = "../model/"
     config["output path"] = "../output/"
     config["scratch path"] = "../scratch/"
@@ -199,23 +225,18 @@ def get_baseline_cv_configs():
         'lr': 0.1,
         'batch_size': 1024,
         'module__dropout': 0,
-        'module__num_units1': 200,
-        'module__num_units2': 50,
+        'module__num_units1': 100,
+        'module__num_units2': 100,
         'module__num_units3': 50,
-        'module__num_units4': 25,
         'max_epochs':100,
         'train_split': skorch.dataset.CVSplit(.3, stratified=True),
         'iterator_train__shuffle':True,
         'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
                                    lower_is_better=True)]}
 
-    configs["4layer-relu"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
-    nnets["4layer-relu"]=configs["4layer-relu"]["model"]
+    configs["3layer-50"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
+    nnets["3layer-50"]=configs["3layer-50"]["model"]
 
-
-
-    paired_ks = [5, 10]
-    nnets = {}
     p3 = {
         'lr': 0.1,
         'batch_size': 1024,
@@ -234,7 +255,7 @@ def get_baseline_cv_configs():
     nnets["3layer"]=configs["3layer"]["model"]
 
     for k in paired_ks:
-        configs[("4layer-relu",k)] = get_base_config(model_fn=PairedKnn, model_params={"f_rep":configs["4layer-relu"]["model"], "f_pred":configs["4layer-relu"]["model"], "n_max":k})
+        configs[("3layer-50",k)] = get_base_config(model_fn=PairedKnn, model_params={"f_rep":configs["3layer-50"]["model"], "f_pred":configs["3layer-50"]["model"], "n_max":k})
         configs[("3layer", k)] = get_base_config(model_fn=PairedKnn,
                                                       model_params={"f_rep": configs["3layer"]["model"],
                                                                     "f_pred": configs["3layer"]["model"],
@@ -255,8 +276,8 @@ def get_baseline_cv_configs():
     #     'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=3, threshold=0.0001, threshold_mode='rel',
     #                                lower_is_better=True)]}
     #
-    # configs["4layer-relu-do"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
-    # nnets["4layer-relu-do"]=configs["4layer-relu-do"]["model"]
+    # configs["3layer-50-do"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
+    # nnets["3layer-50-do"]=configs["3layer-50-do"]["model"]
     # p4 = {
     #     'lr': 0.1,
     #     'batch_size':1024,
@@ -360,16 +381,24 @@ def get_baseline_cv_configs():
                         else:
                             configs[("xgboost",n, o, b)] = get_xgboost_baseline_config(
                                 model_params=p2)
-    for k in paired_ks:
-        for kk, v_model in model_xgbs.items():
-            configs[("4layer-relu", kk, k)] = get_base_config(model_fn=PairedKnn,
-                                                      model_params={"f_rep": configs["4layer-relu"]["model"],
+
+    for kk, v_model in model_xgbs.items():
+        for k in paired_ks:
+            configs[("3layer-50", kk, k)] = get_base_config(model_fn=PairedKnn,
+                                                      model_params={"f_rep": configs["3layer-50"]["model"],
                                                                     "f_pred": v_model["model"],
                                                                     "n_max": k})
             configs[("3layer", kk, k)] = get_base_config(model_fn=PairedKnn,
                                                       model_params={"f_rep": configs["3layer"]["model"],
                                                                     "f_pred": v_model["model"],
                                                                     "n_max": k})
+        configs[("3layer-50", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
+                                                  model_params={"f_rep": configs["3layer-50"]["model"],
+                                                                "f_pred": v_model["model"]})
+        configs[("3layer", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
+                                                  model_params={"f_rep": configs["3layer"]["model"],
+                                                                "f_pred": v_model["model"]})
+
     print("Models #: " + str(len(configs)))
 
 

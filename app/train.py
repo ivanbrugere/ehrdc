@@ -37,8 +37,6 @@ if "train" in config and config["train"]:
             x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs, split_key="id")
         else:
             config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, split_key=split_key)
-            print("Selected: " + str(selected))
-            print(perf)
             jl.dump(config_select, config["model path"] + "config.joblib")
             jl.dump(uids, config["scratch path"] + "uids.joblib")
             del config, configs, data, perf, selected, uids, config_select, metrics_out

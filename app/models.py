@@ -196,14 +196,15 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
         keys_iter = pd.Series(new_pids, name="person_id")
 
     elif split_key=="id":
+        print("Entering sparse processing")
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key)
-
+        print(config["model"])
         #inference
         if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
             p, _ = evaluate_paired_model(config, data_sp)
         else:
             p = config["model"].predict_proba(data_sp)
-
+        print("Finished inference")
         #p = config["model"].predict_proba(data_sp)
         keys_iter = pd.Series(list(p_ids.keys()), name="person_id")
 
@@ -339,9 +340,14 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
         selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
         config_select = configs[selected[0]]
         config_select["date lag"] = selected[1]
+        print("Selected: " + str(selected))
+        print(perf)
+        print("Training full selected model")
         reset_paired_model(config_select)
-        if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
+        if isinstance(config_select["model"], dict) and "nets" in config_select["model"] and "pred" in config_select["model"]:
             train_paired_model(config_select, data_sp, np.array(list(labels_store[selected[1]].values())))
+        elif isinstance(config_select["model"], NeuralNetClassifier):
+            train_nn(config_select["model"], data_sp, np.array(list(labels_store[selected[1]].values())))
         else:
             config_select["model"].fit(data_sp, list(labels_store[selected[1]].values()))
 
