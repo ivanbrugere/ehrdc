@@ -22,7 +22,7 @@ t = time.time()
 split_key = "id"
 configs = model_configs.get_baseline_cv_configs()
 config = list(configs.values())[0]
-load_only=True
+load_only=False
 tt = time.time()
 data = model_includes.read_ehrdc_data(config["train path"])
 print("Data load time:" + str(time.time()-tt))
@@ -41,6 +41,6 @@ if "train" in config and config["train"]:
             print(perf)
             jl.dump(config_select, config["model path"] + "config.joblib")
             jl.dump(uids, config["scratch path"] + "uids.joblib")
-            del config, configs, data, perf, selected, uids, config_select, metrics_out, config_paths, metrics_out, t, tt
+            del config, configs, data, perf, selected, uids, config_select, metrics_out
 print("Total time:" + str(time.time()-t))
 

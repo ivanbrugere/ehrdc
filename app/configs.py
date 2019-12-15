@@ -39,12 +39,12 @@ class DeepEHR(nn.Module):
 
     def forward(self, X, **kwargs):
         X = self.nonlinear(self.dense0(X))
-        X = self.dropout(X)
+        #X = self.dropout(X)
         X = F.relu(self.dense1(X))
-        X = self.dropout(X)
+        #X = self.dropout(X)
         X = F.relu(self.dense2(X))
-        X = self.dropout(X)
         if self.dense3 is not None:
+            X = self.dropout(X)
             X = F.relu(self.dense3(X))
         if "transform" in kwargs:
             return X
@@ -212,9 +212,33 @@ def get_baseline_cv_configs():
     configs["4layer-relu"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
     nnets["4layer-relu"]=configs["4layer-relu"]["model"]
 
+
+
+    paired_ks = [5, 10]
+    nnets = {}
+    p3 = {
+        'lr': 0.1,
+        'batch_size': 1024,
+        'module__dropout': 0,
+        'module__num_units1': 100,
+        'module__num_units2': 100,
+        'module__num_units3': 25,
+        'module__num_units4': 0,
+        'max_epochs':100,
+        'train_split': skorch.dataset.CVSplit(.3, stratified=True),
+        'iterator_train__shuffle':True,
+        'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
+                                   lower_is_better=True)]}
+
+    configs["3layer"] = get_base_config(model_fn=NeuralNetClassifier, model_params={"module": DeepEHR, **p3})
+    nnets["3layer"]=configs["3layer"]["model"]
+
     for k in paired_ks:
         configs[("4layer-relu",k)] = get_base_config(model_fn=PairedKnn, model_params={"f_rep":configs["4layer-relu"]["model"], "f_pred":configs["4layer-relu"]["model"], "n_max":k})
-
+        configs[("3layer", k)] = get_base_config(model_fn=PairedKnn,
+                                                      model_params={"f_rep": configs["3layer"]["model"],
+                                                                    "f_pred": configs["3layer"]["model"],
+                                                                    "n_max": k})
 
     # nnets = {}
     # p3 = {
@@ -342,11 +366,10 @@ def get_baseline_cv_configs():
                                                       model_params={"f_rep": configs["4layer-relu"]["model"],
                                                                     "f_pred": v_model["model"],
                                                                     "n_max": k})
-            configs[("lambda", kk, k)] = get_base_config(model_fn=PairedKnn,
-                                                      model_params={"f_rep": dummy_ret,
+            configs[("3layer", kk, k)] = get_base_config(model_fn=PairedKnn,
+                                                      model_params={"f_rep": configs["3layer"]["model"],
                                                                     "f_pred": v_model["model"],
                                                                     "n_max": k})
-
     print("Models #: " + str(len(configs)))
 
 
