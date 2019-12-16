@@ -89,7 +89,7 @@ class LDA_classifier:
 
 
 class PairedKnn:
-    def __init__(self, f_rep, f_pred, n_max=30, leaf_size=50,metric="cosine"):
+    def __init__(self, f_rep, f_pred, n_max=20, leaf_size=400,metric="cosine"):
         self.f_rep = f_rep
         self.f_pred = f_pred
         self.x_train_t = None
@@ -107,21 +107,25 @@ class PairedKnn:
 
     def fit(self, x_train, y_train):
         if isinstance(self.f_rep, NNC):
+            print("Fit Rep NN: PairedKNN")
             model_includes.train_nn(self.f_rep, x_train, y_train)
             self.x_train_t = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
         else:
+            print("Fit Rep NN: PairedKNN")
             self.x_train_t = self.f_rep(x_train)
 
         if isinstance(self.f_pred, NNC):
+            print("Fit Pred NN: PairedKNN")
             model_includes.train_nn(self.f_pred, x_train, y_train)
         else:
+            print("Fit Pred Other: PairedKNN")
             self.f_pred.fit(x_train, y_train)
 
         self.x_train_p = self.f_pred.predict_proba(x_train)
 
         self.knn_index = sk.neighbors.NearestNeighbors(n_jobs=-1, leaf_size=self.leaf_size, n_neighbors=self.n_max, metric=self.metric)
         self.knn_index.fit(self.x_train_t)
-
+        print("Create KNN Index: PairedKNN")
     def predict_proba(self, x_test, inds=None, x_test_t=None):
         if isinstance(self.f_rep, NNC):
             if x_test_t is None:
@@ -130,8 +134,10 @@ class PairedKnn:
         else:
             x_test_t= self.f_rep(x_test)
         if inds is None or (self.f_rep.module_.cache is not None and self.n_max > self.f_rep.module_.cache.shape[1]):
+            print("Entering compute KNN inds: PairedKNN")
+            print(self.knn_index.kneighbors)
             dists, inds = self.knn_index.kneighbors(x_test_t)
-            print("Computed KNN inds")
+            print("Computed KNN inds: PairedKNN")
         if isinstance(self.f_rep, NNC):
             if self.f_rep.module_.cache_rep is None:
                 self.f_rep.module_.cache_rep = x_test_t
@@ -202,8 +208,8 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = "../train_newest/"
-    config["test path"] = "../infer_newest/"
+    config["train path"] = "../train/"
+    config["test path"] = "../infer/"
     config["model path"] = "../model/"
     config["output path"] = "../output/"
     config["scratch path"] = "../scratch/"
@@ -382,7 +388,7 @@ def get_baseline_cv_configs():
     maxes = [8]
     boosters = ["gbtree", "gblinear", "dart"]
     trees = ["auto", "hist"]
-    scale_pos_weights = [1, 20]
+    scale_pos_weights = [1, 10]
     for o in objectives:
         for n in ns:
             for m in maxes:
