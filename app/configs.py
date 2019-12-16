@@ -373,9 +373,9 @@ def get_baseline_cv_configs():
     objectives = ["binary:logistic"]
     ns = [300]
     sample_type = ["weighted"]
-    alphas = [0]
+    alphas = [0, 1]
     lambdas = [1]
-    feature_selector = ["cyclic", "shuffle", "greedy"]
+    feature_selector = ["cyclic", "shuffle"]
     maxes = [8]
     boosters = ["gbtree", "gblinear", "dart"]
     trees = ["auto", "hist"]
@@ -413,6 +413,7 @@ def get_baseline_cv_configs():
                         elif b == "gblinear":
                             for fs in feature_selector:
                                 p2["feature_selector"] = fs
+                                p2["updater"] = "coord_descent"
                                 for a in alphas:
                                     p2["alpha"] = a
                                     for l in lambdas:

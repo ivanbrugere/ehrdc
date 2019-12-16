@@ -307,9 +307,9 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                     reset_net_model(config)
                 x_apps_train = []
                 x_apps_val = []
-                for key_c, config in configs.items():
+                for jj, (key_c, config) in enumerate(configs.items()):
                     key_c = (key_c, tuple(date_lag))
-                    print("(Model, iteration): " + str((key_c, ii)))
+                    print("(Model,iteration, %): " + str((key_c, ii, jj/len(configs))))
 
                     #train
                     ttt = time.time()
