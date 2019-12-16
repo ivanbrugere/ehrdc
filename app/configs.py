@@ -126,12 +126,12 @@ class PairedKnn:
         if isinstance(self.f_rep, NNC):
             if x_test_t is None:
                 x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
-                print("Computed Representation")
+                print("Computed Representation: KNN")
         else:
             x_test_t= self.f_rep(x_test)
         if inds is None or (self.f_rep.module_.cache is not None and self.n_max > self.f_rep.module_.cache.shape[1]):
             dists, inds = self.knn_index.kneighbors(x_test_t)
-            print("Computed KNN")
+            print("Computed KNN inds")
         if isinstance(self.f_rep, NNC):
             if self.f_rep.module_.cache_rep is None:
                 self.f_rep.module_.cache_rep = x_test_t
@@ -139,6 +139,7 @@ class PairedKnn:
                 self.f_rep.module_.cache = inds
         r1 = []
         r2 = []
+        print("Predicting: KNN")
         for vi in inds:
             r1.append(np.mean(self.x_train_p[vi[0:self.n_max]][:, 0]))
             r2.append(np.mean(self.x_train_p[vi[0:self.n_max]][:, 1]))
@@ -173,12 +174,14 @@ class PairedPipeline:
         if isinstance(self.f_rep, NNC):
             if x_test_t is None:
                 x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
-                print("Computed Representation")
+                print("Computed Representation: Pipeline")
         else:
             x_test_t= self.f_rep(x_test)
+
         if isinstance(self.f_rep, NNC):
             if self.f_rep.module_.cache_rep is None:
                 self.f_rep.module_.cache_rep = x_test_t
+        print("Predicting: Pipeline")
         return self.f_pred.predict_proba(x_test_t)
 
 
@@ -199,8 +202,8 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = "../train/"
-    config["test path"] = "../infer/"
+    config["train path"] = "../train_newest/"
+    config["test path"] = "../infer_newest/"
     config["model path"] = "../model/"
     config["output path"] = "../output/"
     config["scratch path"] = "../scratch/"

@@ -356,7 +356,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
             elif isinstance(config_select["model"], model_configs.NNC):
                 train_nn(config_select["model"], data_sp, np.array(list(labels_store[selected[1]].values())))
             else:
-                config_select["model"].fit(data_sp, list(labels_store[selected[1]].values()))
+                config_select["model"].fit(data_sp, np.array(list(labels_store[selected[1]].values())))
 
     config_select["train shape"] = data_sp.shape
     print("Model cv time: " + str(time.time() - tt))
