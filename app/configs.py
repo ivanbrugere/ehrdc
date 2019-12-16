@@ -263,7 +263,7 @@ def get_baseline_cv_configs():
     #                                                   "n_components": 50})
     paired_ks = [20, 10, 5]
     nnets = {}
-    m_epochs = 200
+    m_epochs = 100
     p3 = {
         'lr': 0.1,
         'batch_size': 1024,
@@ -375,11 +375,11 @@ def get_baseline_cv_configs():
     sample_type = ["weighted"]
     alphas = [0]
     lambdas = [1]
-    feature_selector = ["cyclic", "shuffle"]
+    feature_selector = ["cyclic", "shuffle", "greedy"]
     maxes = [8]
     boosters = ["gbtree", "gblinear", "dart"]
-    trees = ["auto"]
-    scale_pos_weights = [1]
+    trees = ["auto", "hist"]
+    scale_pos_weights = [1, 20]
     for o in objectives:
         for n in ns:
             for m in maxes:
