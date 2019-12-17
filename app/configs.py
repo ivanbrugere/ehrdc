@@ -89,7 +89,7 @@ class LDA_classifier:
 
 
 class PairedKnn:
-    def __init__(self, f_rep, f_pred, n_max=20, leaf_size=400,metric="cosine"):
+    def __init__(self, f_rep, f_pred, n_max=20, leaf_size=50,metric="cosine"):
         self.f_rep = f_rep
         self.f_pred = f_pred
         self.x_train_t = None
@@ -281,7 +281,7 @@ def get_baseline_cv_configs():
         'module__num_units2': 100,
         'module__num_units3': 50,
         'max_epochs':m_epochs,
-        'train_split': skorch.dataset.CVSplit(.3, stratified=True),
+        'train_split': skorch.dataset.CVSplit(.5, stratified=True),
         'iterator_train__shuffle':True,
         'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
                                    lower_is_better=True)]}
@@ -298,7 +298,7 @@ def get_baseline_cv_configs():
         'module__num_units3': 25,
         'module__num_units4': 0,
         'max_epochs':m_epochs,
-        'train_split': skorch.dataset.CVSplit(.3, stratified=True),
+        'train_split': skorch.dataset.CVSplit(.5, stratified=True),
         'iterator_train__shuffle':True,
         'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
                                    lower_is_better=True)]}
@@ -382,7 +382,7 @@ def get_baseline_cv_configs():
     objectives = ["binary:logistic"]
     ns = [300]
     sample_type = ["weighted"]
-    alphas = [0, 1]
+    alphas = [0]
     lambdas = [1]
     feature_selector = ["cyclic", "shuffle"]
     maxes = [8]

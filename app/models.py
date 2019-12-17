@@ -392,6 +392,9 @@ def reset_net_model(config_select):
         config_select["model"].reset()
     elif isinstance(config_select["model"], model_configs.PairedKnn) or isinstance(config_select["model"], model_configs.PairedPipeline):
         config_select["model"].reset()
+    else:
+        config_select["model"] = sk.base.clone(config_select["model"])
+
 
 def empirical_risk(person_feats, labels, th = 20):
     d = c.defaultdict(lambda: [0,0])
