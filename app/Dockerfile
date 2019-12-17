@@ -1,9 +1,12 @@
-FROM python:3.7
+FROM continuumio/miniconda3
 
-# Install dependencies
-RUN pip install --upgrade pip
-RUN pip install pandas numpy datetime joblib xgboost intel-openmp torch torchvision skorch
-RUN pip install -U scikit-learn
+
+RUN conda update --all
+RUN conda install pandas numpy joblib scikit-learn
+RUN conda install pytorch torchvision -c pytorch
+RUN conda install -c conda-forge xgboost
+RUN conda install -c conda-forge openmpi
+RUN conda install -c conda-forge skorch
 
 # Move to the app folder
 RUN bash -c 'mkdir -p /{app, infer, model, output, scratch, train}'
