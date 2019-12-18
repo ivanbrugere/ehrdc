@@ -22,9 +22,12 @@ os.environ["OMP_NUM_THREADS"] = "8"
 
 
 class NNC(NeuralNetClassifier):
-    def reset(self):
-        if hasattr(self, "module_"):
-            delattr(self, "module_")
+
+    def train_nn(self, data_sp, y_label):
+        if (not hasattr(self, "module_")) or self.module_.training:
+            s = data_sp.shape[1]
+            self.module__input_size = s
+            self.fit(data_sp, y_label)
 
 
 class DeepEHR(nn.Module):
@@ -38,7 +41,7 @@ class DeepEHR(nn.Module):
         self.dense2 = nn.Linear(num_units2, num_units3)
         self.train_preds =None
         self.cache = None
-        self.cache_rep=None
+        self.x_train_rep = None
         if num_units3 and num_units4:
             self.dense3 = nn.Linear(num_units3, num_units4)
         else:
@@ -89,55 +92,46 @@ class PairedKnn:
     def __init__(self, f_rep, f_pred, n_max=20, leaf_size=50,metric="cosine"):
         self.f_rep = f_rep
         self.f_pred = f_pred
-        self.x_train_t = None
         self.x_train_p = None
-        self.knn_index = None
         self.n_max = n_max
         self.leaf_size = leaf_size
         self.metric = metric
 
     def reset(self):
-        if isinstance(self.f_rep, NNC):
-            self.f_rep.reset()
-        if isinstance(self.f_pred, NNC):
-            self.f_pred.reset()
+        reset_model(self.f_rep)
+        reset_model(self.f_pred)
+        self.x_train_p = None
 
     def fit(self, x_train, y_train):
-        if isinstance(self.f_rep, NNC):
+
+        if isinstance(self.f_rep, NNC) and (not hasattr(self.f_rep, "module_") or self.f_rep.module_.x_train_rep is None):
             print("Fit Rep NN: PairedKNN")
-            model_includes.train_nn(self.f_rep, x_train, y_train)
-            self.x_train_t = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
-        else:
-            print("Fit Rep NN: PairedKNN")
-            self.x_train_t = self.f_rep(x_train)
+            self.f_rep.train_nn(x_train, y_train)
+            self.f_rep.module_.x_train_rep = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
+            self.f_rep.module_.knn_index = sk.neighbors.NearestNeighbors(n_jobs=-1, leaf_size=self.leaf_size, n_neighbors=self.n_max,
+                                                           metric=self.metric)
+            self.f_rep.module_.knn_index.fit(self.f_rep.module_.x_train_rep)
+            print("Create KNN Index: PairedKNN")
 
         if isinstance(self.f_pred, NNC):
             print("Fit Pred NN: PairedKNN")
-            model_includes.train_nn(self.f_pred, x_train, y_train)
+            self.f_pred.train_nn(x_train, y_train)
         else:
             print("Fit Pred Other: PairedKNN")
-            self.f_pred.fit(x_train, y_train)
+            if not is_fitted(self.f_pred, x_train):
+                self.f_pred.fit(x_train, y_train)
+        if self.x_train_p is None:
+            self.x_train_p = self.f_pred.predict_proba(x_train)
 
-        self.x_train_p = self.f_pred.predict_proba(x_train)
-
-        self.knn_index = sk.neighbors.NearestNeighbors(n_jobs=-1, leaf_size=self.leaf_size, n_neighbors=self.n_max, metric=self.metric)
-        self.knn_index.fit(self.x_train_t)
-        print("Create KNN Index: PairedKNN")
-    def predict_proba(self, x_test, inds=None, x_test_t=None):
+    def predict_proba(self, x_test, inds=None):
         if isinstance(self.f_rep, NNC):
-            if x_test_t is None:
-                x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
-                print("Computed Representation: KNN")
-        else:
-            x_test_t= self.f_rep(x_test)
+            x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+            print("Computed Test Representation: PairedKNN")
+
         if inds is None or (self.f_rep.module_.cache is not None and self.n_max > self.f_rep.module_.cache.shape[1]):
-            print("Entering compute KNN inds: PairedKNN")
-            print(self.knn_index.kneighbors)
-            dists, inds = self.knn_index.kneighbors(x_test_t)
+            dists, inds = self.f_rep.module_.knn_index.kneighbors(x_test_t)
             print("Computed KNN inds: PairedKNN")
         if isinstance(self.f_rep, NNC):
-            if self.f_rep.module_.cache_rep is None:
-                self.f_rep.module_.cache_rep = x_test_t
             if (self.f_rep.module_.cache is not None and inds.shape[1] > self.f_rep.module_.cache.shape[1]) or (self.f_rep.module_.cache is None):
                 self.f_rep.module_.cache = inds
         r1 = []
@@ -155,42 +149,72 @@ class PairedPipeline:
         self.f_rep = f_rep
         self.f_pred = f_pred
 
-    def fit(self, x_train, y_train):
-        if isinstance(self.f_rep, NNC):
-            model_includes.train_nn(self.f_rep, x_train, y_train)
-            x_train_t = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
-        else:
-            x_train_t = self.f_rep(x_train)
-
-        if isinstance(self.f_pred, NNC):
-            model_includes.train_nn(self.f_pred, x_train_t, y_train)
-        else:
-            self.f_pred.fit(x_train_t, y_train)
-
     def reset(self):
-        if isinstance(self.f_rep, NNC):
-            self.f_rep.reset()
-        if isinstance(self.f_pred, NNC):
-            self.f_pred.reset()
+        reset_model(self.f_rep)
+        reset_model(self.f_pred)
 
-    def predict_proba(self, x_test, inds=None, x_test_t=None):
+    def fit(self, x_train, y_train):
+        if isinstance(self.f_rep, NNC) and (not hasattr(self.f_rep, "module_") or self.f_rep.module_.x_train_rep is None):
+            print("Fit Rep NN: PairedPipeline")
+            self.f_rep.train_nn(x_train, y_train)
+            self.f_rep.module_.x_train_rep = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
+        if isinstance(self.f_pred, NNC):
+            self.f_pred.train_nn(self.f_rep.module_.x_train_rep, y_train)
+        else:
+            if not is_fitted(self.f_pred, self.f_rep.module_.x_train_rep):
+                self.f_pred.fit(self.f_rep.module_.x_train_rep, y_train)
+
+    def predict_proba(self, x_test, inds=None):
         if isinstance(self.f_rep, NNC):
-            if x_test_t is None:
-                x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
-                print("Computed Representation: Pipeline")
+            x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+            print("Computed Representation: Pipeline")
         else:
             x_test_t= self.f_rep(x_test)
-
-        if isinstance(self.f_rep, NNC):
-            if self.f_rep.module_.cache_rep is None:
-                self.f_rep.module_.cache_rep = x_test_t
         print("Predicting: Pipeline")
         return self.f_pred.predict_proba(x_test_t)
 
 
+class LargeEnsemble:
+    def __init__(self, models, ensemble=sk.ensemble.StackingClassifier, ensemble_params={}):
+        self.models = models
+        self.ensemble = ensemble(estimators=models, **ensemble_params)
+    def fit(self, x_train, y_train):
+        for m in self.models:
+            if isinstance(m, NNC):
+               m.train_nn(x_train, y_train)
+            elif isinstance(m, PairedPipeline) or isinstance(m, PairedKnn):
+                m.fit(x_train, y_train)
+            else:
+                if not is_fitted(m, x_train):
+                    m.fit(x_train, y_train)
+    def reset(self):
+        for m in self.models:
+            reset_model(m)
+    def predict_proba(self, x_test):
+        return self.ensemble.predict_proba(x_test)
+
 def dummy_ret(x):
     return x
 
+def reset_model(m):
+    if isinstance(m, dict) and "nets" in m:
+        for k, vm in m["nets"].items():
+            reset_model(vm)
+    if isinstance(m, dict) and "preds" in m:
+        reset_model(m["preds"])
+    elif isinstance(m, NNC) and hasattr(m, "module_"):
+        delattr(m, "module_")
+    elif isinstance(m, PairedKnn) or isinstance(m, PairedPipeline):
+        m.reset()
+    else:
+        m.__init__(**m.get_params())
+
+def is_fitted(m, data):
+    try:
+        m.predict_proba(data[0])
+        return 1
+    except:
+        return 0
 
 def get_base_config(model_fn=None, model_params={}, name=None):
     config = {}
@@ -433,7 +457,10 @@ def get_baseline_cv_configs():
                             configs[("xgboost",n, o, b)] = get_xgboost_baseline_config(
                                 model_params=p2)
 
+
     for kk, v_model in model_xgbs.items():
+        v_iter = {"3layer-50": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
+                  "3layer": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"]}
         for k in paired_ks:
             configs[("3layer-50", kk, k)] = get_base_config(model_fn=PairedKnn,
                                                       model_params={"f_rep": configs["3layer-50"]["model"],
@@ -445,10 +472,10 @@ def get_baseline_cv_configs():
                                                                     "n_max": k})
         configs[("3layer-50", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
                                                   model_params={"f_rep": configs["3layer-50"]["model"],
-                                                                "f_pred": v_model["model"]})
+                                                                "f_pred": v_iter["3layer-50"]})
         configs[("3layer", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
                                                   model_params={"f_rep": configs["3layer"]["model"],
-                                                                "f_pred": v_model["model"]})
+                                                                "f_pred": v_iter["3layer"]})
 
     print("Models #: " + str(len(configs)))
 

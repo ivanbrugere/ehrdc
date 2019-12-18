@@ -304,7 +304,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                 print("CV Test data: " + str((x_test.shape, x_test.nnz, x_test.dtype)))
                 #print(keys_train)
                 for key_c, config in configs.items():
-                    reset_net_model(config)
+                    model_configs.reset_model(config["model"])
                 x_apps_train = []
                 x_apps_val = []
                 for jj, (key_c, config) in enumerate(configs.items()):
@@ -316,7 +316,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                     if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
                         x_apps_train = train_paired_model(config, x_train, np.array(y_train), x_apps_train)
                     elif isinstance(config["model"], model_configs.NNC):
-                        train_nn(config["model"], x_train, np.array(y_train))
+                        config["model"].train_nn(x_train, np.array(y_train))
                     else:
                         config["model"].fit(x_train, np.array(y_train))
                     print("CV Train: " + str(time.time() - ttt))
@@ -330,11 +330,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                             inds_iter = config["model"].f_rep.module_.cache
                         else:
                             inds_iter = None
-                        if config["model"].f_rep.module_.cache_rep is not None:
-                            x_rep_iter = config["model"].f_rep.module_.cache_rep
-                        else:
-                            x_rep_iter = None
-                        y_pred = config["model"].predict_proba(x_test, inds=inds_iter, x_test_t=x_rep_iter)
+                        y_pred = config["model"].predict_proba(x_test, inds=inds_iter)
                     else:
                         y_pred = config["model"].predict_proba(x_test)
                     print("CV Predict: " + str(time.time() - ttt) )
@@ -350,11 +346,11 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
             print("Selected: " + str(selected))
             print(perf)
             print("Training full selected model")
-            reset_net_model(config_select)
+            model_configs.reset_model(config_select["model"])
             if isinstance(config_select["model"], dict) and "nets" in config_select["model"] and "pred" in config_select["model"]:
                 train_paired_model(config_select, data_sp, np.array(list(labels_store[selected[1]].values())))
             elif isinstance(config_select["model"], model_configs.NNC):
-                train_nn(config_select["model"], data_sp, np.array(list(labels_store[selected[1]].values())))
+                config_select["model"].train_nn(data_sp, np.array(list(labels_store[selected[1]].values())))
             else:
                 config_select["model"].fit(data_sp, np.array(list(labels_store[selected[1]].values())))
 
@@ -363,7 +359,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
     return config_select, selected, perf, metrics_out, configs, uids_feats
 def evaluate_paired_model(config_select, data_sp, y_label=None, train=False, x_apps=[]):
     for k,vm in config_select["model"]["nets"].items():
-        train_nn(vm, data_sp, y_label)
+        vm.train_nn(data_sp, y_label)
         if not x_apps:
             y_net_pred = vm.predict_proba(data_sp)[:, 1]
             x_apps.append(sp.csr_matrix((y_net_pred, (range(len(y_net_pred)), np.zeros(len(y_net_pred)))),
@@ -375,25 +371,21 @@ def evaluate_paired_model(config_select, data_sp, y_label=None, train=False, x_a
     else:
         return config_select["model"]["pred"].predict_proba(data_sp_iter), x_apps
 
-def train_nn(vm, data_sp, y_label):
-    if (not hasattr(vm, "module_")) or vm.module_.training:
-        s = data_sp.shape[1]
-        vm.module__input_size = s
-        vm.fit(data_sp, y_label)
+
 
 def train_paired_model(config_select, data_sp, y_label, x_apps=[]):
     return evaluate_paired_model(config_select, data_sp, y_label=y_label, train=True, x_apps=x_apps)
 
-def reset_net_model(config_select):
-    if isinstance(config_select["model"], dict) and "nets" in config_select["model"]:
-        for k, vm in config_select["model"]["nets"].items():
-            vm.reset()
-    elif isinstance(config_select["model"], model_configs.NNC):
-        config_select["model"].reset()
-    elif isinstance(config_select["model"], model_configs.PairedKnn) or isinstance(config_select["model"], model_configs.PairedPipeline):
-        config_select["model"].reset()
-    else:
-        config_select["model"] = sk.base.clone(config_select["model"])
+# def reset_model(config_select):
+#     if isinstance(config_select["model"], dict) and "nets" in config_select["model"]:
+#         for k, vm in config_select["model"]["nets"].items():
+#             vm.reset()
+#     elif isinstance(config_select["model"], model_configs.NNC):
+#         config_select["model"].reset()
+#     elif isinstance(config_select["model"], model_configs.PairedKnn) or isinstance(config_select["model"], model_configs.PairedPipeline):
+#         config_select["model"].reset()
+#     else:
+#         config_select["model"] = sk.base.clone(config_select["model"])
 
 
 def empirical_risk(person_feats, labels, th = 20):
