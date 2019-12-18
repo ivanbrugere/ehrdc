@@ -175,8 +175,9 @@ class PairedPipeline:
 
 
 class LargeEnsemble:
-    def __init__(self, models, ensemble=sk.ensemble.StackingClassifier, ensemble_params={}):
+    def __init__(self, models, keys=None, ensemble=sk.ensemble.StackingClassifier, ensemble_params={}):
         self.models = models
+        self.keys = keys
         self.ensemble = ensemble(estimators=models, **ensemble_params)
     def fit(self, x_train, y_train):
         for m in self.models:
@@ -327,12 +328,31 @@ def get_baseline_cv_configs():
     configs["3layer"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p3})
     nnets["3layer"]=configs["3layer"]["model"]
 
-    for k in paired_ks:
-        configs[("3layer-50",k)] = get_base_config(model_fn=PairedKnn, model_params={"f_rep":configs["3layer-50"]["model"], "f_pred":configs["3layer-50"]["model"], "n_max":k})
-        configs[("3layer", k)] = get_base_config(model_fn=PairedKnn,
-                                                      model_params={"f_rep": configs["3layer"]["model"],
-                                                                    "f_pred": configs["3layer"]["model"],
-                                                                    "n_max": k})
+
+
+    p4 = {
+        'lr': 0.1,
+        'batch_size': 1024,
+        'module__dropout':0,
+        'module__num_units1': 10,
+        'module__num_units2': 20,
+        'module__num_units3': 10,
+        'module__num_units4': 0,
+        'max_epochs':m_epochs,
+        'train_split': skorch.dataset.CVSplit(.3, stratified=True),
+        'iterator_train__shuffle':True,
+        'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
+                                   lower_is_better=True)]}
+
+    configs["3layer-small"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p4})
+    nnets["3layer-small"]=configs["3layer-small"]["model"]
+
+    # for k in paired_ks:
+    #     configs[("3layer-50",k)] = get_base_config(model_fn=PairedKnn, model_params={"f_rep":configs["3layer-50"]["model"], "f_pred":configs["3layer-50"]["model"], "n_max":k})
+    #     configs[("3layer", k)] = get_base_config(model_fn=PairedKnn,
+    #                                                   model_params={"f_rep": configs["3layer"]["model"],
+    #                                                                 "f_pred": configs["3layer"]["model"],
+    #                                                                 "n_max": k})
 
     # nnets = {}
     # p3 = {
@@ -401,7 +421,7 @@ def get_baseline_cv_configs():
     model_xgbs = {}
     p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
     objectives = ["binary:logistic"]
-    ns = [300]
+    ns = [400]
     sample_type = ["weighted"]
     alphas = [0, 1]
     lambdas = [1]
@@ -409,7 +429,7 @@ def get_baseline_cv_configs():
     maxes = [8]
     boosters = ["gbtree", "gblinear", "dart"]
     trees = ["auto", "hist"]
-    scale_pos_weights = [1, 10]
+    scale_pos_weights = [1, 10, 20]
     for o in objectives:
         for n in ns:
             for m in maxes:
@@ -460,27 +480,39 @@ def get_baseline_cv_configs():
 
     for kk, v_model in model_xgbs.items():
         v_iter = {"3layer-50": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
-                  "3layer": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"]}
-        for k in paired_ks:
-            configs[("3layer-50", kk, k)] = get_base_config(model_fn=PairedKnn,
-                                                      model_params={"f_rep": configs["3layer-50"]["model"],
-                                                                    "f_pred": v_model["model"],
-                                                                    "n_max": k})
-            configs[("3layer", kk, k)] = get_base_config(model_fn=PairedKnn,
-                                                      model_params={"f_rep": configs["3layer"]["model"],
-                                                                    "f_pred": v_model["model"],
-                                                                    "n_max": k})
+                  "3layer": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
+                  "3layer-small": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"]}
+        # for k in paired_ks:
+        #     configs[("3layer-50", kk, k)] = get_base_config(model_fn=PairedKnn,
+        #                                               model_params={"f_rep": configs["3layer-50"]["model"],
+        #                                                             "f_pred": v_model["model"],
+        #                                                             "n_max": k})
+        #     configs[("3layer", kk, k)] = get_base_config(model_fn=PairedKnn,
+        #                                               model_params={"f_rep": configs["3layer"]["model"],
+        #                                                             "f_pred": v_model["model"],
+        #                                                             "n_max": k})
         configs[("3layer-50", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
                                                   model_params={"f_rep": configs["3layer-50"]["model"],
                                                                 "f_pred": v_iter["3layer-50"]})
         configs[("3layer", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
                                                   model_params={"f_rep": configs["3layer"]["model"],
-                                                                "f_pred": v_iter["3layer"]})
+                                                               "f_pred": v_iter["3layer"]})
+        configs[("3layer-small", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
+                                                  model_params={"f_rep": configs["3layer-small"]["model"],
+                                                               "f_pred": v_iter["3layer-small"]})
+    configs_add = {}
+    ensemble_iters = 10
+    ensemble_choice= [5, 10]
+    for i in range(ensemble_iters):
+        for j in ensemble_choice:
+            a_iter = list(configs.items())
+            items_iter = [a_iter[i] for i in np.random.choice(len(configs), size=j, replace=False)]
+            m_iter = [v for k,v in items_iter]
+            k_iter = [k for k,v in items_iter]
+            configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble_params":{"stack_method":"predict_proba", "n_jobs":-1}})
 
+    configs = dict(list(configs.items())+list(configs_add.items()))
     print("Models #: " + str(len(configs)))
-
-
-
     return configs
 
 
