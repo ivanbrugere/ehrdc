@@ -24,7 +24,6 @@ os.environ["OMP_NUM_THREADS"] = "8"
 class NNC(NeuralNetClassifier):
     def __init__(self, module, *args, **kwargs):
         super(NNC, self).__init__(module, *args, **kwargs)
-        self.x_test_p = None
     def train_nn(self, data_sp, y_label):
         if (not hasattr(self, "module_")) or self.module_.training:
             print("Fit: NNC")
@@ -32,9 +31,7 @@ class NNC(NeuralNetClassifier):
             self.module__input_size = s
             self.fit(data_sp, y_label)
     def predict_proba(self, X):
-        if self.x_test_p is None:
-            self.x_test_p = super(NNC,self).predict_proba(X)
-        return self.x_test_p
+        return super(NNC,self).predict_proba(X)
     def reset(self):
         if hasattr(self, "module_"):
             delattr(m, "module_")
@@ -154,12 +151,12 @@ class PairedPipeline:
     def __init__(self, f_rep, f_pred):
         self.f_rep = f_rep
         self.f_pred = f_pred
-        self.x_test_p = None
+
 
     def reset(self):
         reset_model(self.f_rep)
         reset_model(self.f_pred)
-        self.x_test_p = None
+
 
     def fit(self, x_train, y_train):
         if isinstance(self.f_rep, NNC) and (not hasattr(self.f_rep, "module_") or self.f_rep.module_.x_train_rep is None):
@@ -172,20 +169,19 @@ class PairedPipeline:
             if not is_fitted(self.f_pred, self.f_rep.module_.x_train_rep):
                 print("Fit pred: PairedPipeline")
                 self.f_pred.fit(self.f_rep.module_.x_train_rep, y_train)
-
-    def predict_proba(self, x_test, inds=None):
-        if self.x_test_p is None:
-            if isinstance(self.f_rep, NNC):
-                x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
-                print("Computed Representation: Pipeline")
             else:
-                x_test_t= self.f_rep(x_test)
-            print("Predicting: Pipeline")
-            self.x_test_p = self.f_pred.predict_proba(x_test_t)
-        return self.x_test_p
+                print("Skipped fit pred: PairedPipeline")
+    def predict_proba(self, x_test, inds=None):
+        if isinstance(self.f_rep, NNC):
+            x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+            print("Computed Representation: Pipeline")
+        else:
+            x_test_t= self.f_rep(x_test)
+        print("Predicting: Pipeline")
+        return self.f_pred.predict_proba(x_test_t)
 
 class LargeEnsemble:
-    def __init__(self, models, keys=None, ensemble=sk.linear_model.LogisticRegression, ensemble_params={}):
+    def __init__(self, models, keys=None, ensemble=GradientBoostingClassifier, ensemble_params={}):
         self.models = models
         self.keys = keys
         self.ensemble = ensemble(**ensemble_params)
@@ -206,7 +202,7 @@ class LargeEnsemble:
         ps = []
         for m in self.models:
             ps.append(m.predict_proba(x)[:, 1])
-        return np.transpose(np.array(ps))
+        return np.stack(ps, axis=1)
 
     def reset(self):
         for m in self.models:
@@ -232,9 +228,9 @@ def reset_model(m):
 
 def is_fitted(m, data):
     try:
-        m.predict_proba(data[0])
+        m.predict_proba(data[0:1, :])
         return 1
-    except:
+    except (NotFittedError, xgb.core.XGBoostError):
         return 0
 
 def get_base_config(model_fn=None, model_params={}, name=None):
@@ -442,15 +438,15 @@ def get_baseline_cv_configs():
     model_xgbs = {}
     p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
     objectives = ["binary:logistic"]
-    ns = [400]
+    ns = [300]
     sample_type = ["weighted"]
     alphas = [0, 1]
     lambdas = [1]
     feature_selector = ["cyclic", "shuffle"]
     maxes = [8]
-    boosters = ["gbtree", "gblinear", "dart"]
+    boosters = ["gbtree", "gblinear"]
     trees = ["auto", "hist"]
-    scale_pos_weights = [1, 10, 20]
+    scale_pos_weights = [1, 10]
     for o in objectives:
         for n in ns:
             for m in maxes:
@@ -523,14 +519,14 @@ def get_baseline_cv_configs():
         #                                                        "f_pred": v_iter["3layer-small"]})
     configs_add = {}
     ensemble_iters = 20
-    ensemble_choice= [3, 7]
+    ensemble_choice= [3, 6]
     for i in range(ensemble_iters):
         for j in ensemble_choice:
             a_iter = list(configs.items())
             items_iter = [a_iter[i] for i in np.random.choice(len(configs), size=j, replace=False)]
             m_iter = [v["model"] for k,v in items_iter]
             k_iter = [k for k,v in items_iter]
-            configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble":sk.linear_model.LogisticRegression, "ensemble_params":{}})
+            configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble":sk.linear_model.LogisticRegressionCV, "ensemble_params":{}})
 
     configs = dict(list(configs.items())+list(configs_add.items()))
     print("Models #: " + str(len(configs)))
