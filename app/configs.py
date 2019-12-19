@@ -22,14 +22,23 @@ os.environ["OMP_NUM_THREADS"] = "8"
 
 
 class NNC(NeuralNetClassifier):
-
+    def __init__(self, module, *args, **kwargs):
+        super(NNC, self).__init__(module, *args, **kwargs)
+        self.x_test_p = None
     def train_nn(self, data_sp, y_label):
         if (not hasattr(self, "module_")) or self.module_.training:
+            print("Fit: NNC")
             s = data_sp.shape[1]
             self.module__input_size = s
             self.fit(data_sp, y_label)
-
-
+    def predict_proba(self, X):
+        if self.x_test_p is None:
+            self.x_test_p = super(NNC,self).predict_proba(X)
+        return self.x_test_p
+    def reset(self):
+        if hasattr(self, "module_"):
+            delattr(m, "module_")
+            self.x_test_p = None
 class DeepEHR(nn.Module):
     def __init__(self, input_size=6369, num_units1=100, num_units2=50,num_units3=25, num_units4=0, output_size=2, nonlinear=F.relu, dropout=0.5):
         super(DeepEHR, self).__init__()
@@ -61,8 +70,6 @@ class DeepEHR(nn.Module):
             return X
         else:
             return F.softmax(self.output(X), dim=-1)
-
-
 
 class LDA_classifier:
     def __init__(self, **kwargs):
@@ -114,11 +121,10 @@ class PairedKnn:
             print("Create KNN Index: PairedKNN")
 
         if isinstance(self.f_pred, NNC):
-            print("Fit Pred NN: PairedKNN")
             self.f_pred.train_nn(x_train, y_train)
         else:
-            print("Fit Pred Other: PairedKNN")
             if not is_fitted(self.f_pred, x_train):
+                print("Fit Pred Other: PairedKNN")
                 self.f_pred.fit(x_train, y_train)
         if self.x_train_p is None:
             self.x_train_p = self.f_pred.predict_proba(x_train)
@@ -148,10 +154,12 @@ class PairedPipeline:
     def __init__(self, f_rep, f_pred):
         self.f_rep = f_rep
         self.f_pred = f_pred
+        self.x_test_p = None
 
     def reset(self):
         reset_model(self.f_rep)
         reset_model(self.f_pred)
+        self.x_test_p = None
 
     def fit(self, x_train, y_train):
         if isinstance(self.f_rep, NNC) and (not hasattr(self.f_rep, "module_") or self.f_rep.module_.x_train_rep is None):
@@ -162,17 +170,19 @@ class PairedPipeline:
             self.f_pred.train_nn(self.f_rep.module_.x_train_rep, y_train)
         else:
             if not is_fitted(self.f_pred, self.f_rep.module_.x_train_rep):
+                print("Fit pred: PairedPipeline")
                 self.f_pred.fit(self.f_rep.module_.x_train_rep, y_train)
 
     def predict_proba(self, x_test, inds=None):
-        if isinstance(self.f_rep, NNC):
-            x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
-            print("Computed Representation: Pipeline")
-        else:
-            x_test_t= self.f_rep(x_test)
-        print("Predicting: Pipeline")
-        return self.f_pred.predict_proba(x_test_t)
-
+        if self.x_test_p is None:
+            if isinstance(self.f_rep, NNC):
+                x_test_t = self.f_rep.infer(skorch.utils.to_tensor(x_test, device="cpu", accept_sparse=True),transform=True).data.numpy()
+                print("Computed Representation: Pipeline")
+            else:
+                x_test_t= self.f_rep(x_test)
+            print("Predicting: Pipeline")
+            self.x_test_p = self.f_pred.predict_proba(x_test_t)
+        return self.x_test_p
 
 class LargeEnsemble:
     def __init__(self, models, keys=None, ensemble=sk.linear_model.LogisticRegression, ensemble_params={}):
@@ -182,17 +192,14 @@ class LargeEnsemble:
     def fit(self, x_train, y_train):
         for m in self.models:
             if isinstance(m, NNC):
-                print("Ensemble train:" + str(m))
                 m.train_nn(x_train, y_train)
             elif isinstance(m, PairedPipeline) or isinstance(m, PairedKnn):
-                print("Ensemble train:" + str(m))
                 m.fit(x_train, y_train)
             else:
                 if not is_fitted(m, x_train):
                     print("Ensemble train:" + str(m))
                     m.fit(x_train, y_train)
         ps = self._get_preds(x_train)
-        print("Ensemble train stacking model:" + str(self.ensemble))
         self.ensemble.fit(ps, y_train)
 
     def _get_preds(self, x):
@@ -218,11 +225,7 @@ def reset_model(m):
             reset_model(vm)
     if isinstance(m, dict) and "preds" in m:
         reset_model(m["preds"])
-    elif isinstance(m, NNC) and hasattr(m, "module_"):
-        delattr(m, "module_")
-    elif isinstance(m, PairedKnn) or isinstance(m, PairedPipeline):
-        m.reset()
-    elif isinstance(m, LargeEnsemble):
+    elif isinstance(m, (NNC, PairedKnn, PairedPipeline, LargeEnsemble)):
         m.reset()
     else:
         m.__init__(**m.get_params())
@@ -309,7 +312,7 @@ def get_baseline_cv_configs():
     #
     #
     #                                                   "n_components": 50})
-    A#paired_ks = [20, 10, 5]
+    #paired_ks = [20, 10, 5]
     nnets = {}
     m_epochs = 100
     p3 = {
@@ -527,7 +530,7 @@ def get_baseline_cv_configs():
             items_iter = [a_iter[i] for i in np.random.choice(len(configs), size=j, replace=False)]
             m_iter = [v["model"] for k,v in items_iter]
             k_iter = [k for k,v in items_iter]
-            configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble":sk.linear_model.LogisticRegressionCV, "ensemble_params":{"cv":5}})
+            configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble":sk.linear_model.LogisticRegression, "ensemble_params":{}})
 
     configs = dict(list(configs.items())+list(configs_add.items()))
     print("Models #: " + str(len(configs)))
