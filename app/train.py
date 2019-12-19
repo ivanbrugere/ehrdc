@@ -22,7 +22,7 @@ t = time.time()
 split_key = "id"
 configs = model_configs.get_baseline_cv_configs()
 config = list(configs.values())[0]
-load_only=True
+load_only=False
 tt = time.time()
 data = model_includes.read_ehrdc_data(config["train path"])
 print("Data load time:" + str(time.time()-tt))
