@@ -175,24 +175,38 @@ class PairedPipeline:
 
 
 class LargeEnsemble:
-    def __init__(self, models, keys=None, ensemble=sk.ensemble.StackingClassifier, ensemble_params={}):
+    def __init__(self, models, keys=None, ensemble=sk.linear_model.LogisticRegression, ensemble_params={}):
         self.models = models
         self.keys = keys
-        self.ensemble = ensemble(estimators=models, **ensemble_params)
+        self.ensemble = ensemble(**ensemble_params)
     def fit(self, x_train, y_train):
         for m in self.models:
             if isinstance(m, NNC):
-               m.train_nn(x_train, y_train)
+                print("Ensemble train:" + str(m))
+                m.train_nn(x_train, y_train)
             elif isinstance(m, PairedPipeline) or isinstance(m, PairedKnn):
+                print("Ensemble train:" + str(m))
                 m.fit(x_train, y_train)
             else:
                 if not is_fitted(m, x_train):
+                    print("Ensemble train:" + str(m))
                     m.fit(x_train, y_train)
+        ps = self._get_preds(x_train)
+        print("Ensemble train stacking model:" + str(self.ensemble))
+        self.ensemble.fit(ps, y_train)
+
+    def _get_preds(self, x):
+        ps = []
+        for m in self.models:
+            ps.append(m.predict_proba(x)[:, 1])
+        return np.transpose(np.array(ps))
+
     def reset(self):
         for m in self.models:
             reset_model(m)
     def predict_proba(self, x_test):
-        return self.ensemble.predict_proba(x_test)
+        ps = self._get_preds(x_test)
+        return self.ensemble.predict_proba(ps)
 
 def dummy_ret(x):
     return x
@@ -502,14 +516,14 @@ def get_baseline_cv_configs():
                                                                "f_pred": v_iter["3layer-small"]})
     configs_add = {}
     ensemble_iters = 10
-    ensemble_choice= [5, 10]
+    ensemble_choice= [3, 5, 10]
     for i in range(ensemble_iters):
         for j in ensemble_choice:
             a_iter = list(configs.items())
             items_iter = [a_iter[i] for i in np.random.choice(len(configs), size=j, replace=False)]
-            m_iter = [v for k,v in items_iter]
+            m_iter = [v["model"] for k,v in items_iter]
             k_iter = [k for k,v in items_iter]
-            configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble_params":{"stack_method":"predict_proba", "n_jobs":-1}})
+            configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble":sk.linear_model.LogisticRegressionCV, "ensemble_params":{"cv":5}})
 
     configs = dict(list(configs.items())+list(configs_add.items()))
     print("Models #: " + str(len(configs)))
