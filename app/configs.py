@@ -9,7 +9,7 @@ import numpy as np
 #from autosklearn import classification as ask
 import shutil
 from sklearn.model_selection import GridSearchCV
-
+from sklearn.exceptions import NotFittedError
 import numpy as np
 from sklearn.datasets import make_classification
 from torch import nn
