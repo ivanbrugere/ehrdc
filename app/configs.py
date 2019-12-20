@@ -1,3 +1,4 @@
+import hnswlib
 import sklearn as sk
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.naive_bayes import BernoulliNB #ComplementNB, MultinomialNB
@@ -34,7 +35,7 @@ class NNC(NeuralNetClassifier):
         return super(NNC,self).predict_proba(X)
     def reset(self):
         if hasattr(self, "module_"):
-            delattr(m, "module_")
+            delattr(self, "module_")
             self.x_test_p = None
 class DeepEHR(nn.Module):
     def __init__(self, input_size=6369, num_units1=100, num_units2=50,num_units3=25, num_units4=0, output_size=2, nonlinear=F.relu, dropout=0.5):
@@ -93,13 +94,15 @@ class LDA_classifier:
 
 
 class PairedKnn:
-    def __init__(self, f_rep, f_pred, n_max=20, leaf_size=50,metric="cosine"):
+    def __init__(self, f_rep, f_pred, n_max=20, metric="cosine", use_labels=False, ef=64, M =64):
         self.f_rep = f_rep
         self.f_pred = f_pred
         self.x_train_p = None
         self.n_max = n_max
-        self.leaf_size = leaf_size
         self.metric = metric
+        self.ef = ef
+        self.M = M
+        self.use_labels=use_labels
 
     def reset(self):
         reset_model(self.f_rep)
@@ -112,9 +115,14 @@ class PairedKnn:
             print("Fit Rep NN: PairedKNN")
             self.f_rep.train_nn(x_train, y_train)
             self.f_rep.module_.x_train_rep = self.f_rep.infer(skorch.utils.to_tensor(x_train, device="cpu", accept_sparse=True), transform=True).data.numpy()
-            self.f_rep.module_.knn_index = sk.neighbors.NearestNeighbors(n_jobs=-1, leaf_size=self.leaf_size, n_neighbors=self.n_max,
-                                                           metric=self.metric)
-            self.f_rep.module_.knn_index.fit(self.f_rep.module_.x_train_rep)
+
+            #self.f_rep.module_.knn_index.fit(self.f_rep.module_.x_train_rep)
+            #self.f_rep.module_.knn_index = sk.neighbors.NearestNeighbors(n_jobs=-1, leaf_size=self.leaf_size, n_neighbors=self.n_max,
+            #                                               metric=self.metric)
+            self.f_rep.module_.knn_index = hnswlib.Index(space=self.metric, dim=self.f_rep.module_.x_train_rep.shape[1])
+            self.f_rep.module_.knn_index.init_index(max_elements=self.f_rep.module_.x_train_rep.shape[0], ef_construction=self.ef, M=self.M)
+            self.f_rep.module_.knn_index.set_num_threads(-1)
+            self.f_rep.module_.knn_index.add_items(self.f_rep.module_.x_train_rep)
             print("Create KNN Index: PairedKNN")
 
         if isinstance(self.f_pred, NNC):
@@ -124,7 +132,10 @@ class PairedKnn:
                 print("Fit Pred Other: PairedKNN")
                 self.f_pred.fit(x_train, y_train)
         if self.x_train_p is None:
-            self.x_train_p = self.f_pred.predict_proba(x_train)
+            if self.use_labels:
+                self.x_train_p = y_train
+            else:
+                self.x_train_p = self.f_pred.predict_proba(x_train)
 
     def predict_proba(self, x_test, inds=None):
         if isinstance(self.f_rep, NNC):
@@ -132,7 +143,8 @@ class PairedKnn:
             print("Computed Test Representation: PairedKNN")
 
         if inds is None or (self.f_rep.module_.cache is not None and self.n_max > self.f_rep.module_.cache.shape[1]):
-            dists, inds = self.f_rep.module_.knn_index.kneighbors(x_test_t)
+            #dists, inds = self.f_rep.module_.knn_index.kneighbors(x_test_t)
+            inds, dists = self.f_rep.module_.knn_index.knn_query(x_test_t, k=self.n_max)
             print("Computed KNN inds: PairedKNN")
         if isinstance(self.f_rep, NNC):
             if (self.f_rep.module_.cache is not None and inds.shape[1] > self.f_rep.module_.cache.shape[1]) or (self.f_rep.module_.cache is None):
@@ -308,7 +320,7 @@ def get_baseline_cv_configs():
     #
     #
     #                                                   "n_components": 50})
-    #paired_ks = [20, 10, 5]
+
     nnets = {}
     m_epochs = 100
     p3 = {
@@ -446,7 +458,7 @@ def get_baseline_cv_configs():
     maxes = [8]
     boosters = ["gbtree", "gblinear"]
     trees = ["auto", "hist"]
-    scale_pos_weights = [1, 10]
+    scale_pos_weights = [1, 10, 20]
     for o in objectives:
         for n in ns:
             for m in maxes:
@@ -494,41 +506,45 @@ def get_baseline_cv_configs():
                             configs[("xgboost",n, o, b)] = get_xgboost_baseline_config(
                                 model_params=p2)
 
-
+    paired_ks = [50, 25, 20, 10]
+    #f_rep, f_pred, n_max = 20, metric = "cosine", use_labels = False, ef = 64, M = 64
     for kk, v_model in model_xgbs.items():
-        v_iter = {"3layer-50": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
-                  "3layer": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
-                  "3layer-small": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"]}
-        # for k in paired_ks:
-        #     configs[("3layer-50", kk, k)] = get_base_config(model_fn=PairedKnn,
-        #                                               model_params={"f_rep": configs["3layer-50"]["model"],
-        #                                                             "f_pred": v_model["model"],
-        #                                                             "n_max": k})
-        #     configs[("3layer", kk, k)] = get_base_config(model_fn=PairedKnn,
-        #                                               model_params={"f_rep": configs["3layer"]["model"],
-        #                                                             "f_pred": v_model["model"],
-        #                                                             "n_max": k})
-        configs[("3layer-50", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
-                                                  model_params={"f_rep": configs["3layer-50"]["model"],
-                                                                "f_pred": v_iter["3layer-50"]})
-        configs[("3layer", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
-                                                  model_params={"f_rep": configs["3layer"]["model"],
-                                                               "f_pred": v_iter["3layer"]})
+        # v_iter = {"3layer-50": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
+        #           "3layer": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
+        #           "3layer-small": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"]}
+        for use_labels in [True, False]:
+            for k in paired_ks:
+                configs[("3layer-50", kk, k, use_labels)] = get_base_config(model_fn=PairedKnn,
+                                                          model_params={"f_rep": configs["3layer-50"]["model"],
+                                                                        "f_pred": v_model["model"],
+                                                                        "n_max": k,
+                                                                        "use_labels":use_labels})
+                configs[("3layer", kk, k, use_labels)] = get_base_config(model_fn=PairedKnn,
+                                                          model_params={"f_rep": configs["3layer"]["model"],
+                                                                        "f_pred": v_model["model"],
+                                                                        "n_max": k,
+                                                                        "use_labels":use_labels})
+        # configs[("3layer-50", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
+        #                                           model_params={"f_rep": configs["3layer-50"]["model"],
+        #                                                         "f_pred": v_iter["3layer-50"]})
+        # configs[("3layer", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
+        #                                           model_params={"f_rep": configs["3layer"]["model"],
+        #                                                        "f_pred": v_iter["3layer"]})
         # configs[("3layer-small", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
         #                                           model_params={"f_rep": configs["3layer-small"]["model"],
         #                                                        "f_pred": v_iter["3layer-small"]})
-    configs_add = {}
-    ensemble_iters = 20
-    ensemble_choice= [3, 6]
-    for i in range(ensemble_iters):
-        for j in ensemble_choice:
-            a_iter = list(configs.items())
-            items_iter = [a_iter[i] for i in np.random.choice(len(configs), size=j, replace=False)]
-            m_iter = [v["model"] for k,v in items_iter]
-            k_iter = [k for k,v in items_iter]
-            configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble":sk.linear_model.LogisticRegressionCV, "ensemble_params":{}})
-
-    configs = dict(list(configs.items())+list(configs_add.items()))
+    # configs_add = {}
+    # ensemble_iters = 20
+    # ensemble_choice= [3, 6]
+    # for i in range(ensemble_iters):
+    #     for j in ensemble_choice:
+    #         a_iter = list(configs.items())
+    #         items_iter = [a_iter[i] for i in np.random.choice(len(configs), size=j, replace=False)]
+    #         m_iter = [v["model"] for k,v in items_iter]
+    #         k_iter = [k for k,v in items_iter]
+    #         configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble":sk.linear_model.LogisticRegressionCV, "ensemble_params":{}})
+    #
+    # configs = dict(list(configs.items())+list(configs_add.items()))
     print("Models #: " + str(len(configs)))
     return configs
 
