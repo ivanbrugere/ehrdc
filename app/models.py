@@ -27,14 +27,14 @@ from app import configs as model_configs
 
 def read_ehrdc_data(path, data_keys=None, label_keys=None, useful_keys=None, expand_labels=("person", "person_id", "death_date"),
                     filter_useful=True, apply_label_fn=model_configs.str_to_year):
-    print("Data path: " + str(path))
+    print("Data path: " + str(path), flush=True)
     if data_keys is None:
         data_keys = ["condition_occurrence", "drug_exposure", "measurement", "observation_period", "observation",
                      "person", "procedure_occurrence", "visit_occurrence"]
     if label_keys is None:
         label_keys = ["death"]
 
-    print(os.getcwd())
+    print(os.getcwd(), flush=True)
     with open("OMOP_useful_columns.csv") as f:
         useful_keys = c.defaultdict(list)
         dd = csv.DictReader(f)
@@ -111,10 +111,10 @@ def apply_indexing(data, config, key="id"):
                 if col_key in filter:
                     filter_set = set(filter[col_key])
                     i_iter = [(col_key, i) for i in set(data[table_key][col_key].dropna()) if i in filter_set]
-                    print(str((table_key, col_key, len(i_iter))))
+                    print(str((table_key, col_key, len(i_iter))), flush=True)
                 else:
                     i_iter = [(col_key, i) for i in set(data[table_key][col_key].dropna())]
-                    print(str((table_key, col_key, len(i_iter))))
+                    print(str((table_key, col_key, len(i_iter))), flush=True)
                 if col_key == config["join field"]:
                     uids_record.extend(i_iter)
                 else:
@@ -125,7 +125,7 @@ def apply_indexing(data, config, key="id"):
                 uids_iter.extend([(col_key, i) for i in set(data[table_key][col_key].dropna())])
                 if join_field is not None:
                     uids_iter.extend([(join_field, (int(i), int(j))) for i,j in data[table_key][[join_field, fn_field]].dropna().drop_duplicates().values])
-        print(str(table_key))
+        print(str(table_key), flush=True)
     uids_iter = set(uids_iter)
     uids_record = set(uids_record)
     return data, dict(zip(uids_record, range(len(uids_record)))), dict(zip(uids_iter, range(len(uids_iter)))), index
@@ -138,7 +138,7 @@ def get_grouped_features(data_train, config, uids_feats=None, key="id"):
     data_train, uids_records, uids_feats_ret, index = apply_indexing(data_train, config, key=key)
     if uids_feats is None:
         uids_feats = uids_feats_ret
-    print("Built index: " + str(time.time()-t))
+    print("Built index: " + str(time.time()-t),flush=True)
 
     join_field = config["join field"]
 
@@ -170,8 +170,8 @@ def get_grouped_features(data_train, config, uids_feats=None, key="id"):
                         #print((k_record, k_feat))
                         pid_index[row[join_field_iter]].add(row[fn_field])
                         items[uids_records[k_record]].add(uids_feats[k_feat])
-        print(str(table_key))
-    print("Processed Index: " +str(time.time() - t))
+        print(str(table_key), flush=True)
+    print("Processed Index: " +str(time.time() - t), flush=True)
     return items, uids_feats, uids_records
 
 #get_sparse_person_features_mat(person_items, uids_records, labels, config, key="id", label_values=None, date_lag=(0))
@@ -195,7 +195,7 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
         keys_iter = pd.Series(new_pids, name="person_id")
 
     elif split_key=="id":
-        print("Entering sparse processing")
+        print("Entering sparse processing", flush=True)
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key)
         print(config["model"])
         #inference
@@ -203,12 +203,12 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
             p, _ = evaluate_paired_model(config, data_sp)
         else:
             p = config["model"].predict_proba(data_sp)
-        print("Finished inference")
+        print("Finished inference", flush=True)
         #p = config["model"].predict_proba(data_sp)
         keys_iter = pd.Series(list(p_ids.keys()), name="person_id")
 
     data = None
-    print("Inference time:" + str(time.time() - t))
+    print("Inference time:" + str(time.time() - t), flush=True)
     p[p < 0] = 0
     p[p>1] = 1
     p[np.isnan(p)] = 0
@@ -274,7 +274,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
     person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
     data = None
     metrics_out = c.defaultdict(list)
-    print("Data build time: " + str(time.time() - t))
+    print("Data build time: " + str(time.time() - t), flush=True)
     tt = time.time()
     if not do_cv:
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual,
@@ -300,8 +300,8 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
             for ii in range(iters):
                 config_base = model_configs.get_default_train_test(config_base)
                 x_train, x_test, y_train, y_test, keys_train, keys_test = sk.model_selection.train_test_split(data_sp, list(labels_iter.values()), list(labels_iter.keys()), train_size=config_base["train size"])
-                print("CV Train data: " + str((x_train.shape, x_train.nnz, x_train.dtype)))
-                print("CV Test data: " + str((x_test.shape, x_test.nnz, x_test.dtype)))
+                print("CV Train data: " + str((x_train.shape, x_train.nnz, x_train.dtype)), flush=True)
+                print("CV Test data: " + str((x_test.shape, x_test.nnz, x_test.dtype)), flush=True)
                 #print(keys_train)
                 for key_c, config in configs.items():
                     model_configs.reset_model(config["model"])
@@ -309,7 +309,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                 x_apps_val = []
                 for jj, (key_c, config) in enumerate(configs.items()):
                     key_c = (key_c, tuple(date_lag))
-                    print("(Model,iteration, %): " + str((key_c, ii, jj/len(configs))))
+                    print("(Model,iteration, %): " + str((key_c, ii, jj/len(configs))), flush=True)
 
                     #train
                     ttt = time.time()
@@ -319,7 +319,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                         config["model"].train_nn(x_train, np.array(y_train))
                     else:
                         config["model"].fit(x_train, np.array(y_train))
-                    print("CV Train: " + str(time.time() - ttt))
+                    print("CV Train: " + str(time.time() - ttt), flush=True)
 
                     #eval
                     ttt = time.time()
@@ -333,19 +333,19 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                         y_pred = config["model"].predict_proba(x_test, inds=inds_iter)
                     else:
                         y_pred = config["model"].predict_proba(x_test)
-                    print("CV Predict: " + str(time.time() - ttt) )
+                    print("CV Predict: " + str(time.time() - ttt), flush=True )
                     if split_key == "dates":
                         y_pred, p_ids = get_grouped_preds(y_pred, keys_test, uids_records, p_ids=None, date_lag=date_lag)
                         y_test = [int(labels_back[k]) for k in p_ids]
-                    print("CV Metrics")
+                    print("CV Metrics", flush=True)
                     metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred[:, 1]))
             perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
             selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
             config_select = configs[selected[0]]
             config_select["date lag"] = selected[1]
-            print("Selected: " + str(selected))
-            print(perf)
-            print("Training full selected model")
+            print("Selected: " + str(selected),flush=True)
+            print(perf,flush=True)
+            print("Training full selected model",flush=True)
             model_configs.reset_model(config_select["model"])
             if isinstance(config_select["model"], dict) and "nets" in config_select["model"] and "pred" in config_select["model"]:
                 train_paired_model(config_select, data_sp, np.array(list(labels_store[selected[1]].values())))
@@ -355,7 +355,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
                 config_select["model"].fit(data_sp, np.array(list(labels_store[selected[1]].values())))
 
     config_select["train shape"] = data_sp.shape
-    print("Model cv time: " + str(time.time() - tt))
+    print("Model cv time: " + str(time.time() - tt), flush=True)
     return config_select, selected, perf, metrics_out, configs, uids_feats
 def evaluate_paired_model(config_select, data_sp, y_label=None, train=False, x_apps=[]):
     for k,vm in config_select["model"]["nets"].items():

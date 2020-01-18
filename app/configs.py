@@ -18,7 +18,10 @@ import torch.nn.functional as F
 from sklearn.model_selection import GridSearchCV
 from skorch import NeuralNetClassifier
 import skorch
+import joblib as jl
 import app.models as model_includes
+from pathlib import Path
+import catboost as ct
 os.environ["OMP_NUM_THREADS"] = "8"
 
 
@@ -94,6 +97,7 @@ class LDA_classifier:
 
 
 class PairedKnn:
+
     def __init__(self, f_rep, f_pred, n_max=20, metric="cosine", use_labels=False, ef=64, M =64):
         self.f_rep = f_rep
         self.f_pred = f_pred
@@ -133,7 +137,7 @@ class PairedKnn:
                 self.f_pred.fit(x_train, y_train)
         if self.x_train_p is None:
             if self.use_labels:
-                self.x_train_p = y_train
+                self.x_train_p = np.column_stack([np.logical_not(y_train), y_train])
             else:
                 self.x_train_p = self.f_pred.predict_proba(x_train)
 
@@ -245,6 +249,20 @@ def is_fitted(m, data):
     except (NotFittedError, xgb.core.XGBoostError):
         return 0
 
+def pickle_nms(config, file):
+    if isinstance(config["model"], PairedKnn) and isinstance(config["model"].f_rep, NNC) and hasattr(config["model"].f_rep, "module_") and hasattr(config["model"].f_rep.module_, "knn_index"):
+        config["model"].f_rep.module_.knn_index.save_index(file + "_knn")
+        delattr(config["model"].f_rep.module_, "knn_index")
+    jl.dump(config, file)
+
+def unpickle_nms(file):
+    config = jl.load(file)
+    if Path(file+"_knn").is_file():
+        r = hnswlib.Index(space="cosine", dim=50)
+        r.load_index(file+"_knn")
+        config["model"].f_rep.module_.knn_index = r
+    return config
+
 def get_base_config(model_fn=None, model_params={}, name=None):
     config = {}
     if name is None:
@@ -321,41 +339,41 @@ def get_baseline_cv_configs():
     #
     #                                                   "n_components": 50})
 
-    nnets = {}
-    m_epochs = 100
-    p3 = {
-        'lr': 0.1,
-        'batch_size': 1024,
-        'module__dropout': 0,
-        'module__num_units1': 100,
-        'module__num_units2': 100,
-        'module__num_units3': 50,
-        'module__num_units4': 50,
-        'max_epochs':m_epochs,
-        'train_split': skorch.dataset.CVSplit(.4, stratified=True),
-        'iterator_train__shuffle':True,
-        'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
-                                   lower_is_better=True)]}
-
-    configs["3layer-50"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p3})
-    nnets["3layer-50"]=configs["3layer-50"]["model"]
-
-    p3 = {
-        'lr': 0.1,
-        'batch_size': 1024,
-        'module__dropout': 0,
-        'module__num_units1': 200,
-        'module__num_units2': 100,
-        'module__num_units3': 50,
-        'module__num_units4': 25,
-        'max_epochs':m_epochs,
-        'train_split': skorch.dataset.CVSplit(.4, stratified=True),
-        'iterator_train__shuffle':True,
-        'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
-                                   lower_is_better=True)]}
-
-    configs["3layer"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p3})
-    nnets["3layer"]=configs["3layer"]["model"]
+    # nnets = {}
+    # m_epochs = 100
+    # p3 = {
+    #     'lr': 0.1,
+    #     'batch_size': 1024,
+    #     'module__dropout': 0,
+    #     'module__num_units1': 100,
+    #     'module__num_units2': 100,
+    #     'module__num_units3': 50,
+    #     'module__num_units4': 50,
+    #     'max_epochs':m_epochs,
+    #     'train_split': skorch.dataset.CVSplit(.4, stratified=True),
+    #     'iterator_train__shuffle':True,
+    #     'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
+    #                                lower_is_better=True)]}
+    #
+    # configs["3layer-50"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p3})
+    # nnets["3layer-50"]=configs["3layer-50"]["model"]
+    #
+    # p3 = {
+    #     'lr': 0.1,
+    #     'batch_size': 1024,
+    #     'module__dropout': 0,
+    #     'module__num_units1': 500,
+    #     'module__num_units2': 200,
+    #     'module__num_units3': 100,
+    #     'module__num_units4': 25,
+    #     'max_epochs':m_epochs,
+    #     'train_split': skorch.dataset.CVSplit(.4, stratified=True),
+    #     'iterator_train__shuffle':True,
+    #     'callbacks': [skorch.callbacks.EarlyStopping(monitor='valid_loss', patience=5, threshold=0.0001, threshold_mode='rel',
+    #                                lower_is_better=True)]}
+    #
+    # configs["3layer"] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **p3})
+    # nnets["3layer"]=configs["3layer"]["model"]
 
 
 
@@ -447,83 +465,140 @@ def get_baseline_cv_configs():
     #configs["random stratified"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "stratified"})
     #configs["random uniform"] = get_base_config(model_fn=DummyClassifier,model_params={"strategy": "uniform"})
     # configs["rf"] = get_rf_baseline_config()
-    model_xgbs = {}
-    p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
-    objectives = ["binary:logistic"]
-    ns = [300]
-    sample_type = ["weighted"]
-    alphas = [0, 1]
-    lambdas = [1]
-    feature_selector = ["cyclic", "shuffle"]
-    maxes = [8]
-    boosters = ["gbtree", "gblinear"]
-    trees = ["auto", "hist"]
-    scale_pos_weights = [1, 10, 20]
-    for o in objectives:
-        for n in ns:
-            for m in maxes:
-                for b in boosters:
-                        p2 = p.copy()
-                        p2["n_estimators"] = n
-                        p2["booster"] = b
-                        p2["max_depth"] = m
-                        p2["objective"] = o
-                        if b == "gbtree":
-                            for s in scale_pos_weights:
-                                p2["scale_pos_weight"] = s
-                                for a in alphas:
-                                    p2["alpha"] = a
-                                    for l in lambdas:
-                                        p2["lambda"] = l
-                                        if l != a:
-                                            for t1 in trees:
-                                                p2["tree_method"] = t1
-                                                mm = get_xgboost_baseline_config(model_params=p2.copy())
-                                                #mm["model"] = {"nets":nnets, "pred":mm["model"]}
-                                                configs[("xgboost",n, o,b, t1, s, a, l)] = mm
-                                                model_xgbs[("xgboost",n, o,b, t1, s, a, l)] = mm
 
-                        elif b == "dart":
-                            for st in sample_type:
-                                p2["sample_type"] = st
-                                mm = get_xgboost_baseline_config(model_params=p2.copy())
-                                configs[("xgboost", n, o, b, st)] = mm
-                                model_xgbs[("xgboost", n, o, b, st)] = mm
-                        elif b == "gblinear":
-                            for fs in feature_selector:
-                                p2["feature_selector"] = fs
-                                p2["updater"] = "coord_descent"
-                                for a in alphas:
-                                    p2["alpha"] = a
-                                    for l in lambdas:
-                                        p2["lambda"] = l
-                                        if l != a:
-                                            mm = get_xgboost_baseline_config(model_params=p2.copy())
-                                            ##mm["model"] = {"nets": nnets, "pred":mm["model"]}
-                                            configs[("xgboost",n, o, b, fs, a, l)] = mm
-                                            model_xgbs[("xgboost",n, o, b, fs, a, l)] = mm
-                        else:
-                            configs[("xgboost",n, o, b)] = get_xgboost_baseline_config(
-                                model_params=p2)
 
-    paired_ks = [50, 25, 20, 10]
-    #f_rep, f_pred, n_max = 20, metric = "cosine", use_labels = False, ef = 64, M = 64
-    for kk, v_model in model_xgbs.items():
-        # v_iter = {"3layer-50": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
-        #           "3layer": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
-        #           "3layer-small": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"]}
-        for use_labels in [True, False]:
-            for k in paired_ks:
-                configs[("3layer-50", kk, k, use_labels)] = get_base_config(model_fn=PairedKnn,
-                                                          model_params={"f_rep": configs["3layer-50"]["model"],
-                                                                        "f_pred": v_model["model"],
-                                                                        "n_max": k,
-                                                                        "use_labels":use_labels})
-                configs[("3layer", kk, k, use_labels)] = get_base_config(model_fn=PairedKnn,
-                                                          model_params={"f_rep": configs["3layer"]["model"],
-                                                                        "f_pred": v_model["model"],
-                                                                        "n_max": k,
-                                                                        "use_labels":use_labels})
+
+
+
+
+
+
+
+
+
+
+###### XGB
+
+    #
+    #
+    # model_xgbs = {}
+    # p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
+    # objectives = ["binary:logistic"]
+    # ns = [500]
+    # sample_type = ["weighted"]
+    # alphas = [0]
+    # lambdas = [1]
+    # feature_selector = []
+    # maxes = [8]
+    # boosters = ["gbtree"]
+    # trees = ["hist"]
+    # scale_pos_weights = [1, 10]
+    # for o in objectives:
+    #     for n in ns:
+    #         for m in maxes:
+    #             for b in boosters:
+    #                     p2 = p.copy()
+    #                     p2["n_estimators"] = n
+    #                     p2["booster"] = b
+    #                     p2["max_depth"] = m
+    #                     p2["objective"] = o
+    #                     if b == "gbtree":
+    #                         for s in scale_pos_weights:
+    #                             p2["scale_pos_weight"] = s
+    #                             for a in alphas:
+    #                                 p2["alpha"] = a
+    #                                 for l in lambdas:
+    #                                     p2["lambda"] = l
+    #                                     if l != a:
+    #                                         for t1 in trees:
+    #                                             p2["tree_method"] = t1
+    #                                             mm = get_xgboost_baseline_config(model_params=p2.copy())
+    #                                             #mm["model"] = {"nets":nnets, "pred":mm["model"]}
+    #                                             configs[("xgboost",n, o,b, t1, s, a, l)] = mm
+    #                                             model_xgbs[("xgboost",n, o,b, t1, s, a, l)] = mm
+    #
+    #                     elif b == "dart":
+    #                         for st in sample_type:
+    #                             p2["sample_type"] = st
+    #                             mm = get_xgboost_baseline_config(model_params=p2.copy())
+    #                             configs[("xgboost", n, o, b, st)] = mm
+    #                             model_xgbs[("xgboost", n, o, b, st)] = mm
+    #                     elif b == "gblinear":
+    #                         for fs in feature_selector:
+    #                             p2["feature_selector"] = fs
+    #                             p2["updater"] = "coord_descent"
+    #                             for a in alphas:
+    #                                 p2["alpha"] = a
+    #                                 for l in lambdas:
+    #                                     p2["lambda"] = l
+    #                                     if l != a:
+    #                                         mm = get_xgboost_baseline_config(model_params=p2.copy())
+    #                                         ##mm["model"] = {"nets": nnets, "pred":mm["model"]}
+    #                                         configs[("xgboost",n, o, b, fs, a, l)] = mm
+    #                                         model_xgbs[("xgboost",n, o, b, fs, a, l)] = mm
+    #                     else:
+    #                         configs[("xgboost",n, o, b)] = get_xgboost_baseline_config(
+    #                             model_params=p2)
+
+    #p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
+    depths = [5]
+    objectives = ["Logloss"]
+    ns = [1000]
+    lrs = [0.01,0.05, 0.1]
+    l2_leaf_regs = [1, 9, 18]
+    rsms = [0.5, 1]
+    class_weights = [(.1, .9), (0.25, 0.75)]
+
+    for d in depths:
+        for o in objectives:
+            for lr in lrs:
+                for l2 in l2_leaf_regs:
+                    for rsm in rsms:
+                        for w in class_weights:
+                            for n in ns:
+                                configs[("catboost", d, o, lr, l2, rsm, w, n)] = get_base_config(model_fn=ct.CatBoostClassifier, model_params={"logging_level":"Silent", "n_estimators":n, "depth":d,"loss_function": o, "learning_rate":lr, "l2_leaf_reg":l2, "rsm":rsm, "class_weights":w})
+
+
+    #
+    # sample_type = ["weighted"]
+    # alphas = [0, 1]
+    # lambdas = [1]
+    # feature_selector = ["cyclic", "shuffle"]
+    # maxes = [8]
+    # boosters = ["gbtree", "gblinear"]
+    # trees = ["auto", "hist"]
+    # scale_pos_weights = [1, 10, 20]
+
+    # paired_ks = [50, 25, 20, 10]
+    # #f_rep, f_pred, n_max = 20, metric = "cosine", use_labels = False, ef = 64, M = 64
+    # for k in paired_ks:
+    #     for ii, (kk, v_model) in enumerate(model_xgbs.items()):
+    #         # v_iter = {"3layer-50": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
+    #         #           "3layer": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"],
+    #         #           "3layer-small": get_xgboost_baseline_config(model_params=v_model["model"].get_params())["model"]}
+    #         configs[("3layer-50", kk, k, False)] = get_base_config(model_fn=PairedKnn,
+    #                                                   model_params={"f_rep": configs["3layer-50"]["model"],
+    #                                                                 "f_pred": v_model["model"],
+    #                                                                 "n_max": k,
+    #                                                                 "use_labels":False})
+    #         configs[("3layer", kk, k, False)] = get_base_config(model_fn=PairedKnn,
+    #                                                   model_params={"f_rep": configs["3layer"]["model"],
+    #                                                                 "f_pred": v_model["model"],
+    #                                                                 "n_max": k,
+    #                                                                 "use_labels":False})
+    #         if ii == 0:
+    #             configs[("3layer-50", kk, k, True)] = get_base_config(model_fn=PairedKnn,
+    #                                                                         model_params={
+    #                                                                             "f_rep": configs["3layer-50"]["model"],
+    #                                                                             "f_pred": v_model["model"],
+    #                                                                             "n_max": k,
+    #                                                                             "use_labels": True})
+    #             configs[("3layer", kk, k, True)] = get_base_config(model_fn=PairedKnn,
+    #                                                                      model_params={
+    #                                                                          "f_rep": configs["3layer"]["model"],
+    #                                                                          "f_pred": v_model["model"],
+    #                                                                          "n_max": k,
+    #                                                                          "use_labels": True})
         # configs[("3layer-50", kk, "pipeline")] = get_base_config(model_fn=PairedPipeline,
         #                                           model_params={"f_rep": configs["3layer-50"]["model"],
         #                                                         "f_pred": v_iter["3layer-50"]})
@@ -534,7 +609,7 @@ def get_baseline_cv_configs():
         #                                           model_params={"f_rep": configs["3layer-small"]["model"],
         #                                                        "f_pred": v_iter["3layer-small"]})
     # configs_add = {}
-    # ensemble_iters = 20
+    # ensemble_iters = 3
     # ensemble_choice= [3, 6]
     # for i in range(ensemble_iters):
     #     for j in ensemble_choice:
@@ -545,7 +620,7 @@ def get_baseline_cv_configs():
     #         configs_add[("ensemble", i, j)] = get_base_config(model_fn=LargeEnsemble, model_params={"models": m_iter, "keys":k_iter, "ensemble":sk.linear_model.LogisticRegressionCV, "ensemble_params":{}})
     #
     # configs = dict(list(configs.items())+list(configs_add.items()))
-    print("Models #: " + str(len(configs)))
+    print("Models #: " + str(len(configs)), flush=True)
     return configs
 
 

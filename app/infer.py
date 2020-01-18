@@ -22,10 +22,11 @@ warnings.filterwarnings("ignore", category=FutureWarning)
 
 t = time.time()
 config_paths = model_configs.get_base_config()
-config = jl.load(config_paths["model path"] + "config.joblib")
+config = model_configs.unpickle_nms(config_paths["model path"] + "config.joblib")
+#config = jl.load(config_paths["model path"] + "config.joblib")
 tt = time.time()
 data = model_includes.read_ehrdc_data(config["test path"])
-print("Data load time:" + str(time.time() - tt))
+print("Data load time:" + str(time.time() - tt), flush=True)
 if config["model name"] == "static demographic baseline":
     p = model_includes.model_static_patient_predict(data, config["model"])
     p.to_csv(config_paths["output path"]+ "predictions.csv")
@@ -36,5 +37,5 @@ elif config["model name"] == "static uid model selection":
     else:
         p = model_includes.model_sparse_feature_test(data, config, uids=uids)
     p.to_csv(config_paths["output path"] + "predictions.csv")
-print("total time:" + str(time.time()-t))
+print("total time:" + str(time.time()-t), flush=True)
 
