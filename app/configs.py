@@ -276,18 +276,19 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = "../train/"
-    config["test path"] = "../infer/"
-    config["model path"] = "../model/"
-    config["output path"] = "../output/"
-    config["scratch path"] = "../scratch/"
-    config["filter path"] = "./filter/"
+    config["train path"] = os.path.join("..", "train", "")
+    config["test path"] = os.path.join("..", "infer", "")
+    config["model path"] = os.path.join("..", "model", "")
+    config["output path"] = os.path.join("..", "output", "")
+    config["scratch path"] = os.path.join("..", "scratch", "")
+    config["filter path"] = os.path.join(".", "filter", "")
     config["train"] = True
     config["do cv"] = True
     config["date lags"] = [[0]]
     config["join field"] = "person_id"
     config["cv iters"] = 1
     config["cv split key"] = "id"
+    config["feature importance"] = True
     return config
 
 
