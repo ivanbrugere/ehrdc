@@ -40,10 +40,12 @@ if "train" in config and config["train"]:
             model_configs.pickle_nms(config_select, config["model path"] + "config.joblib" )
 
             if(config["feature importance"]):
-                x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs,
-                                                                                                     split_key="id")
-                importances = config_select["model"].get_feature_importance(type="FeatureImportance",
+                x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs,split_key="id")
+
+                importances = config_select["model"].get_feature_importance(type=config["feature importance method"],
                                                                  data=model_configs.ct.Pool(x_train, y_train))
+                if config["feature importance method"] == "ShapValues":
+                    importances = np.mean(importances, axis=0)
 
                 aa = np.transpose(np.vstack(
                     ([int(v) for k, v in list(uids.keys())], [int(v) for k, v in list(uids.keys())])))
