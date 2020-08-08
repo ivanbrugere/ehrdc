@@ -282,6 +282,8 @@ def get_base_config(model_fn=None, model_params={}, name=None):
     config["output path"] = os.path.join("..", "output", "")
     config["scratch path"] = os.path.join("..", "scratch", "")
     config["filter path"] = os.path.join(".", "filter", "")
+    config["train npy"] = {"path": os.path.join("..", "train_npy", ""), "map": {"alive.npy": 0, "death.npy": 1}, "fields": {"data": "x", "labels":"y"}}
+    config["test npy"] = {"path": os.path.join("..", "train_npy", ""), "map": {"alive.npy": 0, "death.npy": 1}, "fields": {"data": "x", "labels": "y"}}
     config["train"] = True
     config["do cv"] = True
     config["date lags"] = [[0]]
@@ -289,8 +291,8 @@ def get_base_config(model_fn=None, model_params={}, name=None):
     config["cv iters"] = 1
     config["cv split key"] = "id"
     config["feature importance"] = True
-    #config["feature importance method"] = "FeatureImportance"
-    config["feature importance method"] = "ShapValues"
+    config["feature importance method"] = "FeatureImportance"
+    #config["feature importance method"] = "ShapValues"
     return config
 
 
@@ -546,11 +548,11 @@ def get_baseline_cv_configs():
     #p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
     depths = [5]
     objectives = ["Logloss"]
-    ns = [1000, 2000]
-    lrs = [0.01,0.05, 0.1, 0.5]
+    ns = [1000]
+    lrs = [0.01,0.05, 0.1]
     l2_leaf_regs = [1, 9, 18]
     rsms = [0.5, 1]
-    class_weights = [(.1, .9), (0.25, 0.75), (.01, .99)]
+    class_weights = [(.1, .9), (0.25, 0.75)]
 
     for d in depths:
         for o in objectives:

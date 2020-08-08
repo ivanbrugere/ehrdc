@@ -25,7 +25,10 @@ config_paths = model_configs.get_base_config()
 config = model_configs.unpickle_nms(config_paths["model path"] + "config.joblib")
 #config = jl.load(config_paths["model path"] + "config.joblib")
 tt = time.time()
-data = model_includes.read_ehrdc_data(config["test path"])
+if "train npy" in config and os.path.isdir(config["test npy"]["path"]):
+    data = model_includes.read_ehrdc_data(config["test npy"])
+else:
+    data = model_includes.read_ehrdc_data(config["test path"])
 print("Data load time:" + str(time.time() - tt), flush=True)
 if config["model name"] == "static demographic baseline":
     p = model_includes.model_static_patient_predict(data, config["model"])

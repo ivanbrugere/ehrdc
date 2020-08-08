@@ -24,7 +24,10 @@ configs = model_configs.get_baseline_cv_configs()
 config = list(configs.values())[0]
 load_only=False
 tt = time.time()
-data = model_includes.read_ehrdc_data(config["train path"])
+if "train npy" in config and os.path.isdir(config["train npy"]["path"]):
+    data = model_includes.read_ehrdc_data(config["train npy"])
+else:
+    data = model_includes.read_ehrdc_data(config["train path"])
 print("Data load time:" + str(time.time()-tt), flush=True)
 if "train" in config and config["train"]:
     print("Running: " + config["model name"] + "," + config["cv split key"])
@@ -34,6 +37,7 @@ if "train" in config and config["train"]:
     elif config["model name"] == "static uid model selection":
         configs = model_configs.get_baseline_cv_configs()
         if load_only:
+
             x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs, split_key="id")
         else:
             config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, split_key=split_key)

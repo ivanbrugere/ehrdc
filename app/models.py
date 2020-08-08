@@ -28,6 +28,18 @@ from app import configs as model_configs
 def read_ehrdc_data(path, data_keys=None, label_keys=None, useful_keys=None, expand_labels=("person", "person_id", "death_date"),
                     filter_useful=True, apply_label_fn=model_configs.str_to_year):
     print("Data path: " + str(path), flush=True)
+    if isinstance(path, dict):
+        xs = []
+        ys = []
+        for k,v in path["map"].items():
+            x = np.load(os.path.join(path["path"], k))
+            y = np.ones((x.shape[0], 1))*v
+            xs.append(x)
+            ys.append(y)
+
+        return {path["fields"]["data"]: np.vstack(xs), path["fields"]["labels"]:np.transpose(np.vstack(ys))[0]}
+
+
     if data_keys is None:
         data_keys = ["condition_occurrence", "drug_exposure", "measurement", "observation_period", "observation",
                      "person", "procedure_occurrence", "visit_occurrence"]
@@ -178,14 +190,21 @@ def get_grouped_features(data_train, config, uids_feats=None, key="id"):
 
 def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
     t = time.time()
-    p_ids = {j:i for i, j in enumerate(data["person"]["person_id"].copy())}
 
-    person_items, uids_feats, uids_records = get_grouped_features(data, config, uids_feats=uids, key=split_key)
+    if "x" in data and "y" in data:
+        person_items = []
+        uids_feats = dict(zip(zip(range(data["x"].shape[1]), range(data["x"].shape[1])), range(data["x"].shape[1])))
+        uids_records = list(range(len(data["y"])))
+        labels_individual = []
+        p_ids = dict(zip(range(data["x"].shape[0]), range(data["x"].shape[0])))
+    else:
+        p_ids = {j:i for i, j in enumerate(data["person"]["person_id"].copy())}
+        person_items, uids_feats, uids_records = get_grouped_features(data, config, uids_feats=uids, key=split_key)
 
     if split_key == "dates":
         if "date lag" in config:
             date_lag = config["date lag"]
-        data_sp, labels_translated = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key, date_lag=date_lag)
+        data_sp, labels_translated = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key, date_lag=date_lag, data_np=data)
         p_ids_translated = list(labels_translated.keys())
         if isinstance(config["model"], model_configs.NNC):
             p = config["model"].predict_proba(data_sp.astype(np.float32))
@@ -196,7 +215,7 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
 
     elif split_key=="id":
         print("Entering sparse processing", flush=True)
-        data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key)
+        data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key, data_np=data)
         print(config["model"])
         #inference
         if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
@@ -240,18 +259,19 @@ def get_grouped_preds(p, keys_iter, uids_records,p_ids=None, date_lag=[0]):
     return np.array(p), p_ids
 
 def preprocess_data(data, configs, uids=None, split_key="id"):
-    if split_key=="id":
-        labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
-
-    else:
-        labels_individual = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["death_date"].copy())}
     config_base = list(configs.values())[0]
-
     date_lags = config_base["date lags"]
 
-    person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
-    data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base,
-                                                          key=split_key, date_lag=date_lags[0])
+    if "x" in data and "y" in data:
+        data_sp, labels_iter = get_sparse_person_features_mat([], [], [], config_base, data_np=data)
+    else:
+        if split_key=="id":
+            labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
+        else:
+            labels_individual = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["death_date"].copy())}
+        person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
+        data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base,
+                                                              key=split_key, date_lag=date_lags[0])
 
     config_base = model_configs.get_default_train_test(config_base)
     x_train, x_test, y_train, y_test, keys_train, keys_test = sk.model_selection.train_test_split(data_sp, list(labels_iter.values()), list(labels_iter.keys()), train_size=config_base["train size"])
@@ -259,26 +279,34 @@ def preprocess_data(data, configs, uids=None, split_key="id"):
 
 def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
     t = time.time()
-    if split_key=="id":
-        labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
-
-    else:
-        labels_individual = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["death_date"].copy())}
-    labels_back = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
     config_base = list(configs.values())[0]
-
     date_lags = config_base["date lags"]
     do_cv = config_base["do cv"]
     iters = config_base["cv iters"]
 
-    person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
-    data = None
+
+    if "x" in data and "y" in data:
+        person_items = []
+        uids_feats = dict(zip(zip(range(data["x"].shape[1]), range(data["x"].shape[1])), range(data["x"].shape[1])))
+        uids_records = list(range(len(data["y"])))
+        labels_individual = []
+
+
+    else:
+        person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
+
+        labels_back = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
+        data = None
+        if split_key=="id":
+            labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
+        else:
+            labels_individual = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["death_date"].copy())}
     metrics_out = c.defaultdict(list)
     print("Data build time: " + str(time.time() - t), flush=True)
     tt = time.time()
     if not do_cv:
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual,
-                                                           config_base, key=split_key)
+                                                           config_base, key=split_key, data_np=data)
         config_select = config_base
         if isinstance(config_select["model"], model_configs.NNC) or isinstance(config_select["model"], GridSearchCV):
             config_select["model"].param_grid["module__input_size"] = [data_sp.shape[1]]
@@ -294,7 +322,7 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
     else:
         labels_store = {}
         for date_lag in date_lags:
-            data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base, key=split_key,  date_lag=date_lag)
+            data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base, key=split_key,  date_lag=date_lag, data_np=data)
             labels_store[tuple(date_lag)] = labels_iter
 
             for ii in range(iters):
@@ -419,7 +447,11 @@ def get_dict_to_sparse(d1, shape=None, dtype=np.float32):
     else:
         return sp.csr_matrix((np.ones(a.shape[0]), (a[:, 0], a[:, 1])), shape=shape, dtype=dtype)
 
-def get_sparse_person_features_mat(person_items, uids_records, labels_individual, config, key="id", date_lag=[0]):
+def get_sparse_person_features_mat(person_items, uids_records, labels_individual, config, key="id", date_lag=[0], data_np={}):
+
+    if "x" in data_np and "y" in data_np:
+        return sp.csr_matrix(data_np["x"]),dict(zip(range(len(data_np["y"])), data_np["y"]))
+
     if key == "id":
         person_translated = [person_items[uids_records[("person_id", k)]] for k in labels_individual.keys()]
         labels_translated = labels_individual
