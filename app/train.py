@@ -16,6 +16,8 @@ import app.models as model_includes
 import app.configs as model_configs
 
 import warnings
+import os
+import glob
 
 covid = True
 
@@ -37,6 +39,8 @@ if "train npy" in config and os.path.isdir(config["train npy"]["path"]):
 else:
     data = model_includes.read_ehrdc_data(config["train path"], **pipeline_vars)
 print("Data load time:" + str(time.time()-tt), flush=True)
+print(os.getcwd())
+print(glob.glob("*"))
 if "train" in config and config["train"]:
     print("Running: " + config["model name"] + "," + config["cv split key"])
     if config["model name"] == "static demographic baseline":

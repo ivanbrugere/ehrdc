@@ -276,15 +276,16 @@ def get_base_config(model_fn=None, model_params={}, name=None, pipeline=""):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
+    prefix = Path(os.getcwd()).parent
     if pipeline == "covid":
-        config["train path"] = os.path.join("..", "training", "")
-        config["test path"] = os.path.join("..", "evaluation", "")
+        config["train path"] = os.path.join(prefix, "training", "")
+        config["test path"] = os.path.join(prefix, "evaluation", "")
     else:
-        config["train path"] = os.path.join("..", "train", "")
-        config["test path"] = os.path.join("..", "infer", "")
-    config["model path"] = os.path.join("..", "model", "")
-    config["output path"] = os.path.join("..", "output", "")
-    config["scratch path"] = os.path.join("..", "scratch", "")
+        config["train path"] = os.path.join(prefix, "train", "")
+        config["test path"] = os.path.join(prefix, "infer", "")
+    config["model path"] = os.path.join(prefix, "model", "")
+    config["output path"] = os.path.join(prefix, "output", "")
+    config["scratch path"] = os.path.join(prefix, "scratch", "")
     if pipeline == "covid":
         config["filter path"] = ""
     else:
@@ -554,12 +555,12 @@ def get_baseline_cv_configs(pipeline=""):
 
     #p = {"max_depth": 12, "nthread":4, "eval_metric":"auc"}
     depths = [5]
-    objectives = ["Logloss"]
-    ns = [1000]
-    lrs = [0.05]
+    objectives = ["CrossEntropy", "Logloss"]
+    ns = [100, 300, 500]
+    lrs = [0.01, 0.1]
     l2_leaf_regs = [1, 9, 18]
     rsms = [0.5, 1]
-    class_weights = [(.1, .9), (0.25, 0.75)]
+    class_weights = [(.1, .9), (0.01, 0.99)]
 
 
     for d in depths:
@@ -567,9 +568,16 @@ def get_baseline_cv_configs(pipeline=""):
             for lr in lrs:
                 for l2 in l2_leaf_regs:
                     for rsm in rsms:
-                        for w in class_weights:
-                            for n in ns:
-                                configs[("catboost", d, o, lr, l2, rsm, w, n)] = get_base_config(model_fn=ct.CatBoostClassifier, model_params={"logging_level":"Silent", "n_estimators":n, "depth":d,"loss_function": o, "learning_rate":lr, "l2_leaf_reg":l2, "rsm":rsm, "class_weights":w}, pipeline=pipeline)
+                        for n in ns:
+                            for w in class_weights:
+                                par = {"logging_level": "Silent", "n_estimators": n, "depth": d, "loss_function": o,
+                                 "learning_rate": lr, "l2_leaf_reg": l2, "rsm": rsm, "class_weights": w}
+                                if o == "CrossEntropy":
+                                    w = ()
+                                    del par["class_weights"]
+                                configs[("catboost", d, o, lr, l2, rsm, w, n)] = get_base_config(model_fn=ct.CatBoostClassifier, model_params=par, pipeline=pipeline)
+                                if o == "CrossEntropy":
+                                    break
 
 
     #
