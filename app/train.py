@@ -34,6 +34,15 @@ configs = model_configs.get_baseline_cv_configs(**pipeline_vars)
 config = list(configs.values())[0]
 load_only=False
 tt = time.time()
+
+if not os.path.exists(config["output path"]):
+    os.makedirs(config["output path"])
+if not os.path.exists(config["scratch path"]):
+    os.makedirs(config["scratch path"])
+if not os.path.exists(config["model path"]):
+    os.makedirs(config["model path"])
+
+
 if "train npy" in config and os.path.isdir(config["train npy"]["path"]):
     data = model_includes.read_ehrdc_data(config["train npy"], **pipeline_vars)
 else:
@@ -53,6 +62,7 @@ if "train" in config and config["train"]:
             x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs, split_key="id")
         else:
             config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, split_key=split_key)
+            config_select["uids"] = uids
             model_configs.pickle_nms(config_select, config["model path"] + "config.joblib")
 
             if(config["feature importance"]):
@@ -66,11 +76,13 @@ if "train" in config and config["train"]:
                 aa = np.transpose(np.vstack(
                     ([int(v) for k, v in list(uids.keys())], [int(v) for k, v in list(uids.keys())])))
                 pd.DataFrame(aa).to_csv(config["output path"]+ "features.csv", header=None, index=None)
+                print(config["output path"]+ "features.csv")
                 pd.DataFrame(importances).to_csv(config["output path"]+ "feature_weights.csv", header=None, index=None)
-
-
+                print(config["output path"]+ "feature_weights.csv")
             #jl.dump(config_select, config["model path"] + "config.joblib")
-            jl.dump(uids, config["scratch path"] + "uids.joblib")
-            del config, configs, data, perf, selected, uids, config_select, metrics_out
+            # jl.dump(uids, config["model path"] + "uids.joblib")
+            # print(config["model path"] + "uids.joblib")
+            # print(os.path.getsize(config["model path"] + "uids.joblib"))
+            #del config, configs, data, perf, selected, uids, config_select, metrics_out
 print("Total time:" + str(time.time()-t), flush=True)
 

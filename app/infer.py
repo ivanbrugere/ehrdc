@@ -43,7 +43,7 @@ if config["model name"] == "static demographic baseline":
     p = model_includes.model_static_patient_predict(data, config["model"])
     p.to_csv(config_paths["output path"]+ "predictions.csv")
 elif config["model name"] == "static uid model selection":
-    uids = jl.load(config_paths["scratch path"] + "uids.joblib")
+    uids = config["uids"]
     if "cv split key" in config and config["cv split key"] == "dates":
         p = model_includes.model_sparse_feature_test(data, config, uids=uids, split_key=config["cv split key"], date_lag=config["date lag"])
     else:

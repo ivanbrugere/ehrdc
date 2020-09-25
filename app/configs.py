@@ -562,7 +562,6 @@ def get_baseline_cv_configs(pipeline=""):
     rsms = [0.5, 1]
     class_weights = [(.1, .9), (0.01, 0.99)]
 
-
     for d in depths:
         for o in objectives:
             for lr in lrs:
