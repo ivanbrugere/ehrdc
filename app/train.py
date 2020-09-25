@@ -16,18 +16,26 @@ import app.models as model_includes
 import app.configs as model_configs
 
 import warnings
+
+covid = True
+
+if covid:
+    pipeline_vars = {"pipeline": "covid"}
+else:
+    pipeline_vars = {"pipeline": ""}
+
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 t = time.time()
 split_key = "id"
-configs = model_configs.get_baseline_cv_configs()
+configs = model_configs.get_baseline_cv_configs(**pipeline_vars)
 config = list(configs.values())[0]
 load_only=False
 tt = time.time()
 if "train npy" in config and os.path.isdir(config["train npy"]["path"]):
-    data = model_includes.read_ehrdc_data(config["train npy"])
+    data = model_includes.read_ehrdc_data(config["train npy"], **pipeline_vars)
 else:
-    data = model_includes.read_ehrdc_data(config["train path"])
+    data = model_includes.read_ehrdc_data(config["train path"], **pipeline_vars)
 print("Data load time:" + str(time.time()-tt), flush=True)
 if "train" in config and config["train"]:
     print("Running: " + config["model name"] + "," + config["cv split key"])
@@ -35,13 +43,13 @@ if "train" in config and config["train"]:
         config_trained = model_includes.model_static_patient_train(data, data["death"]["label"], config)
         jl.dump(config_trained, config["model path"] + "config.joblib")
     elif config["model name"] == "static uid model selection":
-        configs = model_configs.get_baseline_cv_configs()
+        configs = model_configs.get_baseline_cv_configs(**pipeline_vars)
         if load_only:
 
             x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs, split_key="id")
         else:
             config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, split_key=split_key)
-            model_configs.pickle_nms(config_select, config["model path"] + "config.joblib" )
+            model_configs.pickle_nms(config_select, config["model path"] + "config.joblib")
 
             if(config["feature importance"]):
                 x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs,split_key="id")

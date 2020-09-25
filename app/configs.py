@@ -263,7 +263,7 @@ def unpickle_nms(file):
         config["model"].f_rep.module_.knn_index = r
     return config
 
-def get_base_config(model_fn=None, model_params={}, name=None):
+def get_base_config(model_fn=None, model_params={}, name=None, pipeline=""):
     config = {}
     if name is None:
         config["model name"] = "static uid model selection"
@@ -276,12 +276,19 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    config["train path"] = os.path.join("..", "train", "")
-    config["test path"] = os.path.join("..", "infer", "")
+    if pipeline == "covid":
+        config["train path"] = os.path.join("..", "training", "")
+        config["test path"] = os.path.join("..", "evaluation", "")
+    else:
+        config["train path"] = os.path.join("..", "train", "")
+        config["test path"] = os.path.join("..", "infer", "")
     config["model path"] = os.path.join("..", "model", "")
     config["output path"] = os.path.join("..", "output", "")
     config["scratch path"] = os.path.join("..", "scratch", "")
-    config["filter path"] = os.path.join(".", "filter", "")
+    if pipeline == "covid":
+        config["filter path"] = ""
+    else:
+        config["filter path"] = os.path.join(".", "filter", "")
     config["train npy"] = {"path": os.path.join("..", "train_npy", ""), "map": {"alive.npy": 0, "death.npy": 1}, "fields": {"data": "x", "labels":"y"}}
     config["test npy"] = {"path": os.path.join("..", "train_npy", ""), "map": {"alive.npy": 0, "death.npy": 1}, "fields": {"data": "x", "labels": "y"}}
     config["train"] = True
@@ -296,8 +303,8 @@ def get_base_config(model_fn=None, model_params={}, name=None):
     return config
 
 
-def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200,"n_jobs":-1}, name=None):
-    config = get_base_config(RandomForestClassifier, model_params, name=name)
+def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200,"n_jobs":-1}, name=None, pipeline=""):
+    config = get_base_config(RandomForestClassifier, model_params, name=name, pipeline=pipeline)
     return config
 
 
@@ -306,11 +313,11 @@ def get_naivebayes_baseline_config(model_params={}, name=None):
     return config
 
 
-def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_estimators":100}, name=None):
-    return get_base_config(xgb.sklearn.XGBClassifier, model_params, name=name)
+def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_estimators":100}, name=None, pipeline=""):
+    return get_base_config(xgb.sklearn.XGBClassifier, model_params, name=name, pipeline=pipeline)
 
 
-def get_baseline_cv_configs():
+def get_baseline_cv_configs(pipeline=""):
     configs = dict()
     # configs["aut10o"] = get_base_config(model_fn=ask.AutoSklearnClassifier, model_params={"time_left_for_this_task":1500, "per_run_time_limit":300,
     #                                              "n_jobs":8,
@@ -549,10 +556,11 @@ def get_baseline_cv_configs():
     depths = [5]
     objectives = ["Logloss"]
     ns = [1000]
-    lrs = [0.01,0.05, 0.1]
+    lrs = [0.05]
     l2_leaf_regs = [1, 9, 18]
     rsms = [0.5, 1]
     class_weights = [(.1, .9), (0.25, 0.75)]
+
 
     for d in depths:
         for o in objectives:
@@ -561,7 +569,7 @@ def get_baseline_cv_configs():
                     for rsm in rsms:
                         for w in class_weights:
                             for n in ns:
-                                configs[("catboost", d, o, lr, l2, rsm, w, n)] = get_base_config(model_fn=ct.CatBoostClassifier, model_params={"logging_level":"Silent", "n_estimators":n, "depth":d,"loss_function": o, "learning_rate":lr, "l2_leaf_reg":l2, "rsm":rsm, "class_weights":w})
+                                configs[("catboost", d, o, lr, l2, rsm, w, n)] = get_base_config(model_fn=ct.CatBoostClassifier, model_params={"logging_level":"Silent", "n_estimators":n, "depth":d,"loss_function": o, "learning_rate":lr, "l2_leaf_reg":l2, "rsm":rsm, "class_weights":w}, pipeline=pipeline)
 
 
     #
@@ -640,7 +648,9 @@ def get_default_index(key="id"):
                 "observation":["observation_concept_id"],
                 "measurement": ["measurement_concept_id"],
                 "drug_exposure": ["drug_concept_id"],
-                "person": ["year_of_birth", "gender_concept_id", "race_concept_id", "person_id"]}
+                "person": ["year_of_birth", "gender_concept_id", "race_concept_id", "person_id", "ethnicity_concept_id", "location_id"],
+                "device_exposure": ["device_concept_id", "device_type_concept_id"],
+                "visit_occurrence": ["visit_concept_id", "visit_type_concept_id", "visit_source_concept_id"]}
     elif key=="dates":
         return {"condition_occurrence": [("condition_concept_id", ["condition_start_date","person_id",str_to_year ])],
                 "procedure_occurrence": [("procedure_concept_id", ["procedure_date", "person_id", str_to_year])],

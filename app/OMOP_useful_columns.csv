@@ -119,3 +119,13 @@ observation,observation_source_value,FALSE,FALSE
 observation,observation_source_concept_id,FALSE,FALSE
 observation,unit_source_value,FALSE,FALSE
 observation,qualifier_source_value,FALSE,FALSE
+device_exposure,device_exposure_id,TRUE,TRUE
+device_exposure,person_id,FALSE,TRUE
+device_exposure,device_concept_id,FALSE,TRUE
+device_exposure,drug_exposure_start_date,FALSE,TRUE
+device_exposure,drug_exposure_end_date,FALSE,FALSE
+device_exposure,drug_exposure_start_datetime,FALSE,FALSE
+device_exposure,drug_exposure_end_datetime,FALSE,FALSE
+device_exposure,device_type_concept_id,FALSE,TRUE
+goldstandard,person_id,FALSE,TRUE
+goldstandard,status,FALSE,TRUE

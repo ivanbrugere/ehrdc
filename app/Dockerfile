@@ -24,3 +24,19 @@ COPY . /app/
 
 # Add executable permission to Bash scripts
 RUN chmod +x /app/train.sh /app/infer.sh
+
+# Do not change
+LABEL challenge="covid19"
+
+# Enable training
+LABEL enable_training=true
+
+# Description of the model (max 500 characters)
+LABEL description="COVID diagnosis baseline prediction"
+
+# Comma-separated list of arbitrary feature names used by the model in desc
+# order of importance.
+LABEL ranked_features=""
+
+# Comma-separated list of references (URL)
+LABEL references=""

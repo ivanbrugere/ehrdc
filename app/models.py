@@ -25,8 +25,8 @@ if os.path.basename(os.getcwd()) != "app":
 from app import configs as model_configs
 
 
-def read_ehrdc_data(path, data_keys=None, label_keys=None, useful_keys=None, expand_labels=("person", "person_id", "death_date"),
-                    filter_useful=True, apply_label_fn=model_configs.str_to_year):
+def read_ehrdc_data(path, data_keys=None, label_keys=None,
+                    filter_useful=True, pipeline=""):
     print("Data path: " + str(path), flush=True)
     if isinstance(path, dict):
         xs = []
@@ -41,10 +41,22 @@ def read_ehrdc_data(path, data_keys=None, label_keys=None, useful_keys=None, exp
 
 
     if data_keys is None:
-        data_keys = ["condition_occurrence", "drug_exposure", "measurement", "observation_period", "observation",
+        if pipeline == "covid":
+            data_keys = ["condition_occurrence", "device_exposure", "drug_exposure", "measurement", "observation_period", "observation",
+                     "person", "procedure_occurrence", "visit_occurrence"]
+        else:
+            data_keys = ["condition_occurrence", "drug_exposure", "measurement", "observation_period", "observation",
                      "person", "procedure_occurrence", "visit_occurrence"]
     if label_keys is None:
-        label_keys = ["death"]
+        if pipeline == "covid":
+            label_keys = {"goldstandard": {"in": "status", "out": "status",
+                                           "expand": ("person", "person_id", "status")
+                                           , "fn": lambda x : x}}
+        else:
+            label_keys = {"death": {"in": "death", "out": "status",
+                                    "expand": ("person", "person_id", "death_date"),
+                                    "fn": model_configs.str_to_year}}
+
 
     print(os.getcwd(), flush=True)
     with open("OMOP_useful_columns.csv") as f:
@@ -63,18 +75,22 @@ def read_ehrdc_data(path, data_keys=None, label_keys=None, useful_keys=None, exp
             useful_keys[k] = list(set(useful_keys[k]).intersection(set(pd.read_csv(f, nrows=0).columns)))
             data[k] = pd.read_csv(f, usecols=useful_keys[k])
             data[k] = data[k].dropna(axis=1, how="all")
-    for k in label_keys:
-        f = path + k + ".csv"
+    for k_iter,v in label_keys.items():
+        k, k_out, expand_labels, apply_label_fn = v["in"], v["out"], v["expand"], v["fn"]
+        f = path + k_iter + ".csv"
         if pathlib.Path(f).exists():
-            useful_keys[k] = list(set(useful_keys[k]).intersection(set(pd.read_csv(f, nrows=0).columns)))
-            labels[k] = pd.read_csv(path + k + ".csv", usecols=useful_keys[k])
-            if expand_labels:
-                positives = set(labels[k][expand_labels[1]])
-                expand_values = {k:v for k,v in zip(labels[k][expand_labels[1]], labels[k][expand_labels[2]])}
-                inds = data[expand_labels[0]][expand_labels[1]]
-                a = pd.Series([apply_label_fn(expand_values[i]) if i in positives else np.nan for i in inds])
+            useful_keys[k] = list(set(useful_keys[k_iter]).intersection(set(pd.read_csv(f, nrows=0).columns)))
+            labels[k_out] = pd.read_csv(f, usecols=useful_keys[k_iter])
+
+            positives = set(labels[k_out][expand_labels[1]])
+            expand_values = {k:v for k,v in zip(labels[k][expand_labels[1]], labels[k][expand_labels[2]])}
+            inds = data[expand_labels[0]][expand_labels[1]]
+            a = pd.Series([apply_label_fn(expand_values[i]) if i in positives else np.nan for i in inds])
+            if  pipeline == "covid":
+                b = a
+            else:
                 b = pd.Series([int(i in positives) for i in inds])
-                data[k] = pd.concat([inds, b, a], axis=1, keys=[inds.name, "label", expand_labels[2]])
+            data[k_out] = pd.concat([inds, b, a], axis=1, keys=[inds.name, "label", expand_labels[2]])
 
     return data
 
@@ -100,7 +116,7 @@ def model_static_patient_preprocess(data_train):
 def model_static_patient_train(data_train, labels_train, config):
 
     d = model_static_patient_preprocess(data_train["person"])
-    config["model"].fit(d, labels_train["death"])
+    config["model"].fit(d, labels_train["status"])
     return config
 
 
@@ -118,25 +134,27 @@ def apply_indexing(data, config, key="id"):
             filter = pd.read_csv(config["filter path"] + table_key + "_concepts.csv")
         else:
             filter = {}
-        for col_key in col_list:
-            if isinstance(col_key, str):
-                if col_key in filter:
-                    filter_set = set(filter[col_key])
-                    i_iter = [(col_key, i) for i in set(data[table_key][col_key].dropna()) if i in filter_set]
-                    print(str((table_key, col_key, len(i_iter))), flush=True)
+        if table_key in data:
+            for col_key in col_list:
+                if isinstance(col_key, str):
+                    if col_key in data[table_key]:
+                        if col_key in filter:
+                            filter_set = set(filter[col_key])
+                            i_iter = [(col_key, i) for i in set(data[table_key][col_key].dropna()) if i in filter_set]
+                            print(str((table_key, col_key, len(i_iter))), flush=True)
+                        else:
+                            i_iter = [(col_key, i) for i in set(data[table_key][col_key].dropna())]
+                            print(str((table_key, col_key, len(i_iter))), flush=True)
+                        if col_key == config["join field"]:
+                            uids_record.extend(i_iter)
+                        else:
+                            uids_iter.extend(i_iter)
                 else:
-                    i_iter = [(col_key, i) for i in set(data[table_key][col_key].dropna())]
-                    print(str((table_key, col_key, len(i_iter))), flush=True)
-                if col_key == config["join field"]:
-                    uids_record.extend(i_iter)
-                else:
-                    uids_iter.extend(i_iter)
-            else:
-                (col_key, (fn_field, join_field, fn)) = col_key
-                data[table_key][fn_field] = data[table_key][fn_field].apply(fn)
-                uids_iter.extend([(col_key, i) for i in set(data[table_key][col_key].dropna())])
-                if join_field is not None:
-                    uids_iter.extend([(join_field, (int(i), int(j))) for i,j in data[table_key][[join_field, fn_field]].dropna().drop_duplicates().values])
+                    (col_key, (fn_field, join_field, fn)) = col_key
+                    data[table_key][fn_field] = data[table_key][fn_field].apply(fn)
+                    uids_iter.extend([(col_key, i) for i in set(data[table_key][col_key].dropna())])
+                    if join_field is not None:
+                        uids_iter.extend([(join_field, (int(i), int(j))) for i,j in data[table_key][[join_field, fn_field]].dropna().drop_duplicates().values])
         print(str(table_key), flush=True)
     uids_iter = set(uids_iter)
     uids_record = set(uids_record)
@@ -157,32 +175,31 @@ def get_grouped_features(data_train, config, uids_feats=None, key="id"):
     t = time.time()
     pid_index = c.defaultdict(set)
     for table_key, col_list in index.items():
-        for row in data_train[table_key].itertuples():
-            row = dict(row._asdict())
-            for col_key in col_list:
-                if isinstance(col_key, str):
-
-                    k_record = (join_field, row[join_field])
-                    k_feat = (col_key, row[col_key] )
-                    if col_key != join_field and k_feat in uids_feats and k_record in uids_records:
-                        if len(pid_index):
-                            for p_year in pid_index[row[join_field]]:
-                                k_record = (join_field, (row[join_field], p_year))
-                                items[uids_records[k_record]].add(uids_feats[k_feat])
+        if table_key in data_train:
+            for row in data_train[table_key].itertuples():
+                row = dict(row._asdict())
+                for col_key in col_list:
+                    if col_key in row:
+                        if isinstance(col_key, str):
+                            k_record = (join_field, row[join_field])
+                            k_feat = (col_key, row[col_key] )
+                            if col_key != join_field and k_feat in uids_feats and k_record in uids_records:
+                                if len(pid_index):
+                                    for p_year in pid_index[row[join_field]]:
+                                        k_record = (join_field, (row[join_field], p_year))
+                                        items[uids_records[k_record]].add(uids_feats[k_feat])
+                                else:
+                                    items[uids_records[k_record]].add(uids_feats[k_feat])
                         else:
-                            items[uids_records[k_record]].add(uids_feats[k_feat])
+                            (col_key_iter, (fn_field, join_field_iter, fn)) = col_key
+                            k_record = (join_field_iter, (row[join_field_iter], row[fn_field]))
+                            k_feat = (col_key_iter, row[col_key_iter])
 
-
-                else:
-                    (col_key_iter, (fn_field, join_field_iter, fn)) = col_key
-                    k_record = (join_field_iter, (row[join_field_iter], row[fn_field]))
-                    k_feat = (col_key_iter, row[col_key_iter])
-
-                    if k_feat in uids_feats and k_record in uids_records:
-                        #print((k_record, k_feat))
-                        pid_index[row[join_field_iter]].add(row[fn_field])
-                        items[uids_records[k_record]].add(uids_feats[k_feat])
-        print(str(table_key), flush=True)
+                            if k_feat in uids_feats and k_record in uids_records:
+                                #print((k_record, k_feat))
+                                pid_index[row[join_field_iter]].add(row[fn_field])
+                                items[uids_records[k_record]].add(uids_feats[k_feat])
+            print(str(table_key), flush=True)
     print("Processed Index: " +str(time.time() - t), flush=True)
     return items, uids_feats, uids_records
 
@@ -266,9 +283,7 @@ def preprocess_data(data, configs, uids=None, split_key="id"):
         data_sp, labels_iter = get_sparse_person_features_mat([], [], [], config_base, data_np=data)
     else:
         if split_key=="id":
-            labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
-        else:
-            labels_individual = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["death_date"].copy())}
+            labels_individual = {k:v for k,v in zip(data["status"]["person_id"].copy(), data["status"]["label"].copy())}
         person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, labels_individual, config_base,
                                                               key=split_key, date_lag=date_lags[0])
@@ -295,12 +310,11 @@ def model_sparse_feature_cv_train(data, configs, uids=None, split_key="id"):
     else:
         person_items, uids_feats, uids_records = get_grouped_features(data, config_base, uids_feats=uids, key=split_key)
 
-        labels_back = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
-        data = None
+        labels_back = {k: v for k, v in zip(data["status"]["person_id"].copy(), data["status"]["label"].copy())}
+        #data = None
         if split_key=="id":
-            labels_individual = {k:v for k,v in zip(data["death"]["person_id"].copy(), data["death"]["label"].copy())}
-        else:
-            labels_individual = {k: v for k, v in zip(data["death"]["person_id"].copy(), data["death"]["death_date"].copy())}
+            labels_individual = {k:v for k,v in zip(data["status"]["person_id"].copy(), data["status"]["label"].copy())}
+
     metrics_out = c.defaultdict(list)
     print("Data build time: " + str(time.time() - t), flush=True)
     tt = time.time()
