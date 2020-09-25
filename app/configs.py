@@ -278,8 +278,8 @@ def get_base_config(model_fn=None, model_params={}, name=None, pipeline=""):
     config["model"] = config["model_fn"](**model_params)
     prefix = Path(os.getcwd()).parent
     if pipeline == "covid":
-        config["train path"] = os.path.join(prefix, "training", "")
-        config["test path"] = os.path.join(prefix, "evaluation", "")
+        config["train path"] = os.path.join(prefix, "data", "")
+        config["test path"] = os.path.join(prefix, "data", "")
     else:
         config["train path"] = os.path.join(prefix, "train", "")
         config["test path"] = os.path.join(prefix, "infer", "")

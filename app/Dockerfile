@@ -36,7 +36,7 @@ LABEL description="COVID diagnosis baseline prediction"
 
 # Comma-separated list of arbitrary feature names used by the model in desc
 # order of importance.
-LABEL ranked_features=""
+LABEL ranked_features="all concept ids"
 
 # Comma-separated list of references (URL)
-LABEL references=""
+LABEL references="N/A"
