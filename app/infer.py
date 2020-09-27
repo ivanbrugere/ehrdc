@@ -14,7 +14,7 @@ if os.path.basename(os.getcwd()) != "app":
     os.chdir(os.getcwd() +'/app')
 import joblib as jl
 from app import models as model_includes
-from app import configs as model_configs
+from app import model_configs as model_configs
 import time
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)

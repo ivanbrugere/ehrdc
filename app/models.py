@@ -22,7 +22,7 @@ import skorch
 if os.path.basename(os.getcwd()) != "app":
     os.chdir(os.getcwd() +'/app')
 
-from app import configs as model_configs
+from app import model_configs as model_configs
 
 
 def read_ehrdc_data(path, data_keys=None, label_keys=None,
@@ -56,9 +56,6 @@ def read_ehrdc_data(path, data_keys=None, label_keys=None,
             label_keys = {"death": {"in": "death", "out": "status",
                                     "expand": ("person", "person_id", "death_date"),
                                     "fn": model_configs.str_to_year}}
-
-
-    print(os.getcwd(), flush=True)
     with open("OMOP_useful_columns.csv") as f:
         useful_keys = c.defaultdict(list)
         dd = csv.DictReader(f)
@@ -231,10 +228,7 @@ def model_sparse_feature_test(data, config, uids,split_key="id", date_lag=[0]):
         keys_iter = pd.Series(new_pids, name="person_id")
 
     elif split_key=="id":
-        print("Entering sparse processing", flush=True)
         data_sp, labels_iter = get_sparse_person_features_mat(person_items, uids_records, p_ids, config, key=split_key, data_np=data)
-        print(config["model"])
-        #inference
         if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
             p, _ = evaluate_paired_model(config, data_sp)
         else:
@@ -462,10 +456,8 @@ def get_dict_to_sparse(d1, shape=None, dtype=np.float32):
         return sp.csr_matrix((np.ones(a.shape[0]), (a[:, 0], a[:, 1])), shape=shape, dtype=dtype)
 
 def get_sparse_person_features_mat(person_items, uids_records, labels_individual, config, key="id", date_lag=[0], data_np={}):
-
     if "x" in data_np and "y" in data_np:
         return sp.csr_matrix(data_np["x"]),dict(zip(range(len(data_np["y"])), data_np["y"]))
-
     if key == "id":
         person_translated = [person_items[uids_records[("person_id", k)]] for k in labels_individual.keys()]
         labels_translated = labels_individual
@@ -476,7 +468,6 @@ def get_sparse_person_features_mat(person_items, uids_records, labels_individual
             label_index = label_index.union(set([(i,j-lag_i) for i,j in labels_individual.items() if not np.isnan(j)]))
         labels_translated = {i:0 if uids_records_rev[i][1] not in label_index else 1 for i in person_items.keys()}
         person_translated = list(person_items.values())
-
     if "train shape" in config:
         person_sparse = get_dict_to_sparse(person_translated, shape=(len(person_translated), config["train shape"][1]))
     else:

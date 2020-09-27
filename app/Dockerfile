@@ -14,7 +14,7 @@ RUN rm -rf /var/lib/apt/lists/*
 RUN pip install pybind11
 RUN pip install scikit-learn==0.22
 #RUN conda install -c conda-forge compilers
-RUN pip install hnswlib
+#RUN pip install hnswlib
 # Move to the app folder
 RUN bash -c 'mkdir -p /{app, infer, model, output, scratch, train}'
 WORKDIR /app/

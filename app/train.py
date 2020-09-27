@@ -13,13 +13,15 @@ if os.path.basename(os.getcwd()) != "app":
 import time
 import joblib as jl
 import app.models as model_includes
-import app.configs as model_configs
+import app.model_configs as model_configs
 
 import warnings
 import os
 import glob
-
+import catboost as ct
 covid = True
+
+model_names = ["embed", "embed-knn", "ada", "catboost"]
 
 if covid:
     pipeline_vars = {"pipeline": "covid"}
@@ -30,7 +32,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 t = time.time()
 split_key = "id"
-configs = model_configs.get_baseline_cv_configs(**pipeline_vars)
+configs = model_configs.get_baseline_cv_configs(**pipeline_vars, model_names=model_names)
 config = list(configs.values())[0]
 load_only=False
 tt = time.time()
@@ -47,16 +49,14 @@ if "train npy" in config and os.path.isdir(config["train npy"]["path"]):
     data = model_includes.read_ehrdc_data(config["train npy"], **pipeline_vars)
 else:
     data = model_includes.read_ehrdc_data(config["train path"], **pipeline_vars)
-print("Data load time:" + str(time.time()-tt), flush=True)
-print(os.getcwd())
-print(glob.glob("*"))
+print("Data load time:" + str(time.time()-tt))
 if "train" in config and config["train"]:
     print("Running: " + config["model name"] + "," + config["cv split key"])
     if config["model name"] == "static demographic baseline":
         config_trained = model_includes.model_static_patient_train(data, data["death"]["label"], config)
         jl.dump(config_trained, config["model path"] + "config.joblib")
     elif config["model name"] == "static uid model selection":
-        configs = model_configs.get_baseline_cv_configs(**pipeline_vars)
+        configs = model_configs.get_baseline_cv_configs(**pipeline_vars, model_names=model_names)
         if load_only:
 
             x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs, split_key="id")
@@ -65,7 +65,7 @@ if "train" in config and config["train"]:
             config_select["uids"] = uids
             model_configs.pickle_nms(config_select, config["model path"] + "config.joblib")
 
-            if(config["feature importance"]):
+            if(config["feature importance"] and isinstance(config_select["model"], ct.CatBoostClassifier) ):
                 x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs,split_key="id")
 
                 importances = config_select["model"].get_feature_importance(type=config["feature importance method"],
