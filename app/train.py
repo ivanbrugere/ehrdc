@@ -14,14 +14,17 @@ import time
 import joblib as jl
 import app.models as model_includes
 import app.model_configs as model_configs
-
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, AdaBoostClassifier
 import warnings
 import os
 import glob
 import catboost as ct
+
+#RUN COVID PIPELINE
 covid = True
 
-model_names = ["embed", "embed-knn", "ada", "catboost"]
+#RUN different models
+model_names = ["ada", "catboost"]
 
 if covid:
     pipeline_vars = {"pipeline": "covid"}
@@ -44,7 +47,7 @@ if not os.path.exists(config["scratch path"]):
 if not os.path.exists(config["model path"]):
     os.makedirs(config["model path"])
 
-
+#if numpy data path found, load it
 if "train npy" in config and os.path.isdir(config["train npy"]["path"]):
     data = model_includes.read_ehrdc_data(config["train npy"], **pipeline_vars)
 else:
@@ -64,6 +67,9 @@ if "train" in config and config["train"]:
             config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, split_key=split_key)
             config_select["uids"] = uids
             model_configs.pickle_nms(config_select, config["model path"] + "config.joblib")
+            importances = None
+            if (config["feature importance"] and isinstance(config_select["model"], AdaBoostClassifier)):
+                importances = config_select["model"].feature_importances_
 
             if(config["feature importance"] and isinstance(config_select["model"], ct.CatBoostClassifier) ):
                 x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs,split_key="id")
@@ -77,8 +83,9 @@ if "train" in config and config["train"]:
                     ([int(v) for k, v in list(uids.keys())], [int(v) for k, v in list(uids.keys())])))
                 pd.DataFrame(aa).to_csv(config["output path"]+ "features.csv", header=None, index=None)
                 print(config["output path"]+ "features.csv")
-                pd.DataFrame(importances).to_csv(config["output path"]+ "feature_weights.csv", header=None, index=None)
-                print(config["output path"]+ "feature_weights.csv")
+                if importances:
+                    pd.DataFrame(importances).to_csv(config["output path"]+ "feature_weights.csv", header=None, index=None)
+                    print(config["output path"]+ "feature_weights.csv")
             #jl.dump(config_select, config["model path"] + "config.joblib")
             # jl.dump(uids, config["model path"] + "uids.joblib")
             # print(config["model path"] + "uids.joblib")

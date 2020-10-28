@@ -283,12 +283,12 @@ def get_base_config(model_fn=None, model_params={}, name=None, pipeline=""):
     else:
         config["filter path"] = os.path.join(".", "filter", "")
     config["train npy"] = {"path": os.path.join("..", "train_npy", ""), "map": {"alive.npy": 0, "death.npy": 1}, "fields": {"data": "x", "labels":"y"}}
-    config["test npy"] = {"path": os.path.join("..", "train_npy", ""), "map": {"alive.npy": 0, "death.npy": 1}, "fields": {"data": "x", "labels": "y"}}
+    config["test npy"] = {"path": os.path.join("..", "test_npy", ""), "map": {"alive.npy": 0, "death.npy": 1}, "fields": {"data": "x", "labels": "y"}}
     config["train"] = True
     config["do cv"] = True
     config["date lags"] = [[0]]
     config["join field"] = "person_id"
-    config["cv iters"] = 1
+    config["cv iters"] = 3
     config["cv split key"] = "id"
     config["feature importance"] = True
     config["feature importance method"] = "FeatureImportance"
@@ -323,11 +323,11 @@ def get_baseline_cv_configs(pipeline="", model_names=["catboost"]):
                     configs[("adaboost", d, lr, n)] = get_base_config(model_fn=AdaBoostClassifier,model_params=par,pipeline=pipeline)
     if "catboost" in model_names:
 
-        depths = [8]
+        depths = [7]
         objectives = ["Logloss", "CrossEntropy"]
         ns = [250, 500]
-        lrs = [0.01, 0.1]
-        l2_leaf_regs = [1, 3]
+        lrs = [0.01, 0.05]
+        l2_leaf_regs = [1, 3, 6]
         rsms = [.5, 1]
         class_weights = [None, "Balanced"]
 
