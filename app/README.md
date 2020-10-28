@@ -28,7 +28,7 @@ This sets the models to be evaluated. Their definition and parameters are set [h
 
 For now, default model values are inconveniently in the [configs](https://github.com/ivanbrugere/ehrdc/blob/9112f5e3b92ea6f8d8d36d5a79a251e93c68038b/app/model_configs.py#L258), most of these shouldn't need editing, except perhaps:
 
-```config["cv iters"] = 3 ``` ([permalink](https://github.com/ivanbrugere/ehrdc/blob/9112f5e3b92ea6f8d8d36d5a79a251e93c68038b/app/model_configs.py#L291))
+```config["cv iters"] = 5 ``` ([permalink](https://github.com/ivanbrugere/ehrdc/blob/7d9230f7e0b7326fce9b8c607f518d5513d7ab54/app/model_configs.py#L291))
 
 This adjusts the number of randomized train-test splits to evaluate each model model over. Increasing this yields a more robust estimate of relative model accuracy. Selection is done over the max-mean model (with no variance penalty). 
 
