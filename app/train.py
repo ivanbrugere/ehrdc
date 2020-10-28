@@ -66,7 +66,6 @@ if "train" in config and config["train"]:
         else:
             config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs, split_key=split_key)
             config_select["uids"] = uids
-            model_configs.pickle_nms(config_select, config["model path"] + "config.joblib")
             importances = None
             if (config["feature importance"] and isinstance(config_select["model"], AdaBoostClassifier)):
                 importances = config_select["model"].feature_importances_
@@ -85,6 +84,7 @@ if "train" in config and config["train"]:
             if importances is not None:
                 pd.DataFrame(importances).to_csv(config["output path"]+ "feature_weights.csv", header=None, index=None)
                 print(config["output path"]+ "feature_weights.csv")
+            model_configs.pickle_nms(config_select, config["model path"] + "config.joblib")
             #jl.dump(config_select, config["model path"] + "config.joblib")
             # jl.dump(uids, config["model path"] + "uids.joblib")
             # print(config["model path"] + "uids.joblib")
