@@ -32,7 +32,7 @@ For now, default model values are inconveniently in the [configs](https://github
 
 This adjusts the number of randomized train-test splits to evaluate each model model over. Increasing this yields a more robust estimate of relative model accuracy. Note that all models are evaluated on the same train-test split per iteration (rather than sampling a new split per model, per iter). 
 
-###Pipeline
+### Pipeline
 
 ```covid = True ``` [permalink](https://github.com/ivanbrugere/ehrdc/blob/9112f5e3b92ea6f8d8d36d5a79a251e93c68038b/app/train.py#L24) 
 
