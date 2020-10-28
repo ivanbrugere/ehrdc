@@ -71,7 +71,7 @@ if "train" in config and config["train"]:
             if (config["feature importance"] and isinstance(config_select["model"], AdaBoostClassifier)):
                 importances = config_select["model"].feature_importances_
 
-            if(config["feature importance"] and isinstance(config_select["model"], ct.CatBoostClassifier) ):
+            elif(config["feature importance"] and isinstance(config_select["model"], ct.CatBoostClassifier) ):
                 x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs,split_key="id")
 
                 importances = config_select["model"].get_feature_importance(type=config["feature importance method"],
@@ -79,13 +79,13 @@ if "train" in config and config["train"]:
                 if config["feature importance method"] == "ShapValues":
                     importances = np.mean(importances, axis=0)
 
-                aa = np.transpose(np.vstack(
-                    ([int(v) for k, v in list(uids.keys())], [int(v) for k, v in list(uids.keys())])))
-                pd.DataFrame(aa).to_csv(config["output path"]+ "features.csv", header=None, index=None)
-                print(config["output path"]+ "features.csv")
-                if importances:
-                    pd.DataFrame(importances).to_csv(config["output path"]+ "feature_weights.csv", header=None, index=None)
-                    print(config["output path"]+ "feature_weights.csv")
+            aa = np.transpose(np.vstack(
+                ([int(v) for k, v in list(uids.keys())], [int(v) for k, v in list(uids.keys())])))
+            pd.DataFrame(aa).to_csv(config["output path"]+ "features.csv", header=None, index=None)
+            print(config["output path"]+ "features.csv")
+            if importances is not None:
+                pd.DataFrame(importances).to_csv(config["output path"]+ "feature_weights.csv", header=None, index=None)
+                print(config["output path"]+ "feature_weights.csv")
             #jl.dump(config_select, config["model path"] + "config.joblib")
             # jl.dump(uids, config["model path"] + "uids.joblib")
             # print(config["model path"] + "uids.joblib")

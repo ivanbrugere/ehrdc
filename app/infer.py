@@ -34,7 +34,7 @@ config_paths = model_configs.get_base_config(**pipeline_vars)
 config = model_configs.unpickle_nms(config_paths["model path"] + "config.joblib")
 #config = jl.load(config_paths["model path"] + "config.joblib")
 tt = time.time()
-if "train npy" in config and os.path.isdir(config["test npy"]["path"]):
+if "test npy" in config and os.path.isdir(config["test npy"]["path"]):
     data = model_includes.read_ehrdc_data(config["test npy"], **pipeline_vars)
 else:
     data = model_includes.read_ehrdc_data(config["test path"], **pipeline_vars)
