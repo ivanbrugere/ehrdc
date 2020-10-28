@@ -288,7 +288,7 @@ def get_base_config(model_fn=None, model_params={}, name=None, pipeline=""):
     config["do cv"] = True
     config["date lags"] = [[0]]
     config["join field"] = "person_id"
-    config["cv iters"] = 3
+    config["cv iters"] = 5
     config["cv split key"] = "id"
     config["feature importance"] = True
     config["feature importance method"] = "FeatureImportance"
