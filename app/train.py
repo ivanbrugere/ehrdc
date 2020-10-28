@@ -70,7 +70,6 @@ if "train" in config and config["train"]:
             importances = None
             if (config["feature importance"] and isinstance(config_select["model"], AdaBoostClassifier)):
                 importances = config_select["model"].feature_importances_
-
             elif(config["feature importance"] and isinstance(config_select["model"], ct.CatBoostClassifier) ):
                 x_train, x_test, y_train, y_test, keys_train, keys_test = model_includes.preprocess_data(data, configs,split_key="id")
 
