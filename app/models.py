@@ -39,59 +39,6 @@ def read_ehrdc_data(path, data_keys=None, label_keys=None,
 
         return {path["fields"]["data"]: np.vstack(xs), path["fields"]["labels"]:np.transpose(np.vstack(ys))[0]}
 
-
-    if data_keys is None:
-        if pipeline == "covid":
-            data_keys = ["condition_occurrence", "device_exposure", "drug_exposure", "measurement", "observation_period", "observation",
-                     "person", "procedure_occurrence", "visit_occurrence"]
-        else:
-            data_keys = ["condition_occurrence", "drug_exposure", "measurement", "observation_period", "observation",
-                     "person", "procedure_occurrence", "visit_occurrence"]
-    if label_keys is None:
-        if pipeline == "covid":
-            label_keys = {"goldstandard": {"in": "status", "out": "status",
-                                           "expand": ("person", "person_id", "status")
-                                           , "fn": lambda x : x}}
-        else:
-            label_keys = {"death": {"in": "death", "out": "status",
-                                    "expand": ("person", "person_id", "death_date"),
-                                    "fn": model_configs.str_to_year}}
-    with open("OMOP_useful_columns.csv") as f:
-        useful_keys = c.defaultdict(list)
-        dd = csv.DictReader(f)
-        for r in dd:
-            if filter_useful and r["Useful"] == "TRUE":
-                useful_keys[r["TabNam"]].append(r["ColNam"])
-            elif not filter_useful:
-                useful_keys[r["TabNam"]].append(r["ColNam"])
-    data = {}
-    labels = {}
-    for k in data_keys:
-        f = path + k + ".csv"
-        if pathlib.Path(f).exists():
-            useful_keys[k] = list(set(useful_keys[k]).intersection(set(pd.read_csv(f, nrows=0).columns)))
-            data[k] = pd.read_csv(f, usecols=useful_keys[k])
-            data[k] = data[k].dropna(axis=1, how="all")
-    for k_iter,v in label_keys.items():
-        k, k_out, expand_labels, apply_label_fn = v["in"], v["out"], v["expand"], v["fn"]
-        f = path + k_iter + ".csv"
-        if pathlib.Path(f).exists():
-            useful_keys[k] = list(set(useful_keys[k_iter]).intersection(set(pd.read_csv(f, nrows=0).columns)))
-            labels[k_out] = pd.read_csv(f, usecols=useful_keys[k_iter])
-
-            positives = set(labels[k_out][expand_labels[1]])
-            expand_values = {k:v for k,v in zip(labels[k][expand_labels[1]], labels[k][expand_labels[2]])}
-            inds = data[expand_labels[0]][expand_labels[1]]
-            a = pd.Series([apply_label_fn(expand_values[i]) if i in positives else np.nan for i in inds])
-            if  pipeline == "covid":
-                b = a
-            else:
-                b = pd.Series([int(i in positives) for i in inds])
-            data[k_out] = pd.concat([inds, b, a], axis=1, keys=[inds.name, "label", expand_labels[2]])
-
-    return data
-
-
 def model_static_patient_preprocess(data_train):
     pop_fields = ['day_of_birth', 'time_of_birth']
     one_hot_fields = ['gender_concept_id',
