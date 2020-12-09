@@ -1,32 +1,21 @@
-#import hnswlib
 import sklearn as sk
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier, AdaBoostClassifier
-from sklearn.naive_bayes import BernoulliNB #ComplementNB, MultinomialNB
+from sklearn.naive_bayes import BernoulliNB
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.neighbors import NearestNeighbors
-from sklearn.dummy import DummyClassifier
-from sklearn.neighbors import KNeighborsClassifier
 import xgboost as xgb
 import os
-import numpy as np
-#from autosklearn import classification as ask
-import shutil
-from sklearn.model_selection import GridSearchCV
 from sklearn.exceptions import NotFittedError
 import numpy as np
-from sklearn.datasets import make_classification
 from torch import nn
 import torch.nn.functional as F
-from sklearn.model_selection import GridSearchCV
-from skorch import NeuralNetBinaryClassifier, NeuralNetClassifier
+from skorch import NeuralNetClassifier
 import skorch
 import joblib as jl
-import app.models as model_includes
 from pathlib import Path
 import catboost as ct
 import torch
 os.environ["OMP_NUM_THREADS"] = "8"
-
 
 class NNC(NeuralNetClassifier):
     def __init__(self, module, *args, **kwargs):
@@ -255,7 +244,7 @@ def unpickle_nms(file):
     config = jl.load(file)
     return config
 
-def get_base_config(model_fn=None, model_params={}, name=None, pipeline=""):
+def get_base_config(model_fn=None, model_params={}, name=None):
     config = {}
     if name is None:
         config["model name"] = "static uid model selection"
@@ -269,21 +258,11 @@ def get_base_config(model_fn=None, model_params={}, name=None, pipeline=""):
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
     prefix = Path(os.getcwd()).parent
-    if pipeline == "covid":
-        config["train path"] = os.path.join(prefix, "data", "")
-        config["test path"] = os.path.join(prefix, "data", "")
-    else:
-        config["train path"] = os.path.join(prefix, "train", "")
-        config["test path"] = os.path.join(prefix, "infer", "")
     config["model path"] = os.path.join(prefix, "model", "")
     config["output path"] = os.path.join(prefix, "output", "")
     config["scratch path"] = os.path.join(prefix, "scratch", "")
-    if pipeline == "covid":
-        config["filter path"] = ""
-    else:
-        config["filter path"] = os.path.join(".", "filter", "")
-    config["train npy"] = {"path": os.path.join("..", "train_npy", ""), "map": {"alive.npy": 0, "death.npy": 1}, "fields": {"data": "x", "labels":"y"}}
-    config["test npy"] = {"path": os.path.join("..", "test_npy", ""), "map": {"alive.npy": 0, "death.npy": 1}, "fields": {"data": "x", "labels": "y"}}
+    config["train npy"] = {"path": os.path.join("..", "train", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels":"y"}}
+    config["test npy"] = {"path": os.path.join("..", "test", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels": "y"}}
     config["train"] = True
     config["do cv"] = True
     config["date lags"] = [[0]]
@@ -296,8 +275,8 @@ def get_base_config(model_fn=None, model_params={}, name=None, pipeline=""):
     return config
 
 
-def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200,"n_jobs":-1}, name=None, pipeline=""):
-    config = get_base_config(RandomForestClassifier, model_params, name=name, pipeline=pipeline)
+def get_rf_baseline_config(model_params={"max_depth": 100, "n_estimators":200,"n_jobs":-1}, name=None):
+    config = get_base_config(RandomForestClassifier, model_params, name=name)
     return config
 
 
@@ -306,11 +285,10 @@ def get_naivebayes_baseline_config(model_params={}, name=None):
     return config
 
 
-def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_estimators":100}, name=None, pipeline=""):
-    return get_base_config(xgb.sklearn.XGBClassifier, model_params, name=name, pipeline=pipeline)
+def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_estimators":100}, name=None):
+    return get_base_config(xgb.sklearn.XGBClassifier, model_params, name=name)
 
-
-def get_baseline_cv_configs(pipeline="", model_names=["catboost"]):
+def get_baseline_cv_configs(model_names=["catboost"]):
     configs = dict()
     if "ada" in model_names:
         depths = [1, 2, 3, 4]
@@ -320,7 +298,7 @@ def get_baseline_cv_configs(pipeline="", model_names=["catboost"]):
             for lr in lrs:
                 for n in ns:
                     par = {"n_estimators": n, "learning_rate": lr, "base_estimator": DecisionTreeClassifier(max_depth=d)}
-                    configs[("adaboost", d, lr, n)] = get_base_config(model_fn=AdaBoostClassifier,model_params=par,pipeline=pipeline)
+                    configs[("adaboost", d, lr, n)] = get_base_config(model_fn=AdaBoostClassifier,model_params=par)
     if "catboost" in model_names:
 
         depths = [7]
@@ -343,21 +321,21 @@ def get_baseline_cv_configs(pipeline="", model_names=["catboost"]):
                                     if o == "CrossEntropy":
                                         w = ()
                                         del par["auto_class_weights"]
-                                    configs[("catboost", d, o, lr, l2, rsm, w, n)] = get_base_config(model_fn=ct.CatBoostClassifier, model_params=par, pipeline=pipeline)
+                                    configs[("catboost", d, o, lr, l2, rsm, w, n)] = get_base_config(model_fn=ct.CatBoostClassifier, model_params=par)
                                     if o == "CrossEntropy":
                                         break
     nets = {}
     if "embed" in model_names:
-            nets = get_net_params(pipeline)
+            nets = get_net_params()
             configs = {**configs, **nets}
 
     if "embed-knn" in model_names:
         paired_ks = [3,5,7]
         if not len(nets):
-            nets = get_net_params(pipeline)
+            nets = get_net_params()
         for net_k, net in nets.items():
             for k in paired_ks:
-                configs[(net_k,k)] = get_base_config(model_fn=PairedKnn, model_params={"f_rep":nets[net_k]["model"], "f_pred":nets[net_k]["model"], "n_max":k}, pipeline=pipeline)
+                configs[(net_k,k)] = get_base_config(model_fn=PairedKnn, model_params={"f_rep":nets[net_k]["model"], "f_pred":nets[net_k]["model"], "n_max":k})
 
     print("Models #: " + str(len(configs)))
     return configs
@@ -380,7 +358,7 @@ def build_net_params(lr=0.05, batch_size=1024, dropout=0.2,units= [200, 100, 50,
             'iterator_train__shuffle': shuffle,
             'callbacks': callbacks}
 
-def get_net_params(pipeline, configs={}):
+def get_net_params(configs={}):
     lrs = [0.05]
     ps = dict()
 
@@ -392,30 +370,10 @@ def get_net_params(pipeline, configs={}):
         ps[("4-layer-small-leaky", lr)] = build_net_params(units=[20, 20, 10, 10], nonlinear=F.leaky_relu, lr=lr)
         ps[("3-layer-small-leaky", lr)] = build_net_params(units=[20, 10, 10, 0], nonlinear=F.leaky_relu, lr=lr)
         for k,v in ps.items():
-            configs[k] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **v}, pipeline=pipeline)
+            configs[k] = get_base_config(model_fn=NNC, model_params={"module": DeepEHR, **v})
     return configs
 
 
-def str_to_year(x):
-    return int(x[0:4]) if isinstance(x,str) else np.nan
-
-
-def get_default_index(key="id"):
-    if key=="id":
-        return {"condition_occurrence": ["condition_concept_id"],
-                "procedure_occurrence": ["procedure_concept_id"],
-                "observation":["observation_concept_id"],
-                "measurement": ["measurement_concept_id"],
-                "drug_exposure": ["drug_concept_id"],
-                "person": ["year_of_birth", "gender_concept_id", "race_concept_id", "person_id", "ethnicity_concept_id", "location_id"],
-                "device_exposure": ["device_concept_id", "device_type_concept_id"],
-                "visit_occurrence": ["visit_concept_id", "visit_type_concept_id", "visit_source_concept_id"]}
-    elif key=="dates":
-        return {"condition_occurrence": [("condition_concept_id", ["condition_start_date","person_id",str_to_year ])],
-                "procedure_occurrence": [("procedure_concept_id", ["procedure_date", "person_id", str_to_year])],
-                "measurement": [("measurement_concept_id", ["measurement_date", "person_id", str_to_year])],
-                "drug_exposure": [("drug_concept_id", ["drug_exposure_start_date", "person_id", str_to_year])],
-                "person": ["year_of_birth", "gender_concept_id", "race_concept_id", "person_id"]}
 def get_default_train_test(config):
     if "train size" not in config:
         config["train size"] = 0.5
