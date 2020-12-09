@@ -7,14 +7,8 @@ This readme outlines the running of the [EHR dream challenge pipeline](https://w
 The prerequisites are ideally installed into a docker environment using the included Docker file. Or can be installed manually: 
 
 ```
-pytorch
-xgboost
-openmpi
-skorch
 catboost
 ```
-
-
 
 ## Training
 
@@ -34,18 +28,12 @@ This adjusts the number of randomized train-test splits to evaluate each model m
 
 Note that all models are evaluated on the same train-test split per iteration (rather than sampling a new split per model, per iter). 
 
-### Pipeline
-
-```covid = True ``` [permalink](https://github.com/ivanbrugere/ehrdc/blob/9112f5e3b92ea6f8d8d36d5a79a251e93c68038b/app/train.py#L24) 
-
-This runs on the CODID-19 dream challenge data definition. "False" yields the EHR Mortality Prediction Dream Challenge pipeline
-
 ## Numpy input
 
 Both pipelines prefer numpy data input, when available. To run on preprocessed numpy input create the following paths:
 ```
-./train_npy/
-./test_npy/
+./train/
+./test/
 
 ```
 

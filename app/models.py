@@ -30,10 +30,7 @@ def model_sparse_feature_test(data, config):
     p_ids = dict(zip(range(data["x"].shape[0]), range(data["x"].shape[0])))
 
     data_sp, labels_iter = get_sparse_person_features_mat(data)
-    if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
-        p, _ = evaluate_paired_model(config, data_sp)
-    else:
-        p = config["model"].predict_proba(data_sp)
+    p = config["model"].predict_proba(data_sp)
     print("Finished inference", flush=True)
 
     keys_iter = pd.Series(list(p_ids.keys()), name="person_id")
@@ -52,8 +49,6 @@ def model_sparse_feature_cv_train(data, configs):
     iters = config_base["cv iters"]
     uids_feats = dict(zip(zip(range(data["x"].shape[1]), range(data["x"].shape[1])), range(data["x"].shape[1])))
 
-
-
     metrics_out = c.defaultdict(list)
     print("Data build time: " + str(time.time() - t), flush=True)
     tt = time.time()
@@ -70,34 +65,18 @@ def model_sparse_feature_cv_train(data, configs):
 
         for key_c, config in configs.items():
             model_configs.reset_model(config["model"])
-        x_apps_train = []
-        x_apps_val = []
         for jj, (key_c, config) in enumerate(configs.items()):
             key_c = (key_c, tuple(date_lag))
             print("(Model,iteration, %): " + str((key_c, ii, jj/len(configs))), flush=True)
 
             #train
             ttt = time.time()
-            if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
-                x_apps_train = train_paired_model(config, x_train, np.array(y_train), x_apps_train)
-            elif isinstance(config["model"], model_configs.NNC):
-                config["model"].train_nn(x_train, np.array(y_train))
-            else:
-                config["model"].fit(x_train, np.array(y_train))
+            config["model"].fit(x_train, np.array(y_train))
             print("CV Train: " + str(time.time() - ttt), flush=True)
 
             #eval
             ttt = time.time()
-            if isinstance(config["model"], dict) and "nets" in config["model"] and "pred" in config["model"]:
-                y_pred, x_apps_val = evaluate_paired_model(config, x_test, x_apps_val)
-            elif (isinstance(config["model"], model_configs.PairedKnn) or isinstance(config["model"], model_configs.PairedPipeline)) and isinstance(config["model"].f_rep, model_configs.NNC) and hasattr(config["model"].f_rep, "module_"):
-                if config["model"].f_rep.module_.cache is not None:
-                    inds_iter = config["model"].f_rep.module_.cache
-                else:
-                    inds_iter = None
-                y_pred = config["model"].predict_proba(x_test, inds=inds_iter)
-            else:
-                y_pred = config["model"].predict_proba(x_test)
+            y_pred = config["model"].predict_proba(x_test)
             print("CV Predict: " + str(time.time() - ttt), flush=True)
             metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred[:, 1]))
     perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
@@ -108,12 +87,7 @@ def model_sparse_feature_cv_train(data, configs):
     print(perf,flush=True)
     print("Training full selected model",flush=True)
     model_configs.reset_model(config_select["model"])
-    if isinstance(config_select["model"], dict) and "nets" in config_select["model"] and "pred" in config_select["model"]:
-        train_paired_model(config_select, data_sp, np.array(list(labels_store[selected[1]].values())))
-    elif isinstance(config_select["model"], model_configs.NNC):
-        config_select["model"].train_nn(data_sp, np.array(list(labels_store[selected[1]].values())))
-    else:
-        config_select["model"].fit(data_sp, np.array(list(labels_store[selected[1]].values())))
+    config_select["model"].fit(data_sp, np.array(list(labels_store[selected[1]].values())))
 
     config_select["train shape"] = data_sp.shape
     print("Model cv time: " + str(time.time() - tt), flush=True)
@@ -134,8 +108,7 @@ def evaluate_paired_model(config_select, data_sp, y_label=None, train=False, x_a
     else:
         return config_select["model"]["pred"].predict_proba(data_sp_iter), x_apps
 
-def train_paired_model(config_select, data_sp, y_label, x_apps=[]):
-    return evaluate_paired_model(config_select, data_sp, y_label=y_label, train=True, x_apps=x_apps)
+
 
 def get_sparse_person_features_mat(data_np):
     return sp.csr_matrix(data_np["x"]), dict(zip(range(len(data_np["y"])), data_np["y"]))
