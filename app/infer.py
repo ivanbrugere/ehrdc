@@ -1,10 +1,10 @@
 import os
 import sys
-sys.path.extend(['/'])
 if os.path.basename(os.getcwd()) != "app":
     os.chdir(os.getcwd() +'/app')
-from app import models as model_includes
-from app import model_configs as model_configs
+sys.path.append(os.getcwd())
+import models as model_includes
+import model_configs as model_configs
 import time
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)

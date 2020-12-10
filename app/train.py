@@ -2,12 +2,12 @@ import pandas as pd
 import numpy as np
 import os
 import sys
-sys.path.extend(['/'])
 if os.path.basename(os.getcwd()) != "app":
     os.chdir(os.getcwd() +'/app')
+sys.path.append(os.getcwd())
 import time
-import app.models as model_includes
-import app.model_configs as model_configs
+import models as model_includes
+import model_configs as model_configs
 from sklearn.ensemble import AdaBoostClassifier
 import warnings
 import os

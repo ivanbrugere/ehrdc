@@ -9,7 +9,7 @@ import time
 if os.path.basename(os.getcwd()) != "app":
     os.chdir(os.getcwd() +'/app')
 
-from app import model_configs as model_configs
+import model_configs as model_configs
 
 def read_ehrdc_data(path):
     print("Data path: " + str(path), flush=True)
