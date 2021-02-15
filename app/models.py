@@ -494,3 +494,15 @@ def clear_all():
         if 'module' in str(globals()[var]): continue
 
     del globals()[var]
+
+def features_todict(inds, weights, path):
+    ret = []
+    d = {z["concept_id"]: z["concept_name"] for y, z in pd.read_csv(path).iterrows()}
+    for i, (k,v) in enumerate(zip(inds, weights)):
+        if k in d:
+            ret.append({"id": i, "name": int(k), "description": d[k], "weight":float(v), "concept_codes": [int(k)],
+                            "value_column": None,
+                            "reference_column": None,
+                            "function": "count",
+                            "time_range": None})
+    return ret

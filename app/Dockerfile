@@ -13,6 +13,7 @@ RUN apt-get clean
 RUN rm -rf /var/lib/apt/lists/*
 RUN pip install pybind11
 RUN pip install scikit-learn==0.22
+RUN pip install ujson
 #RUN conda install -c conda-forge compilers
 #RUN pip install hnswlib
 # Move to the app folder

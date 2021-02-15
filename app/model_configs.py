@@ -288,7 +288,7 @@ def get_base_config(model_fn=None, model_params={}, name=None, pipeline=""):
     config["do cv"] = True
     config["date lags"] = [[0]]
     config["join field"] = "person_id"
-    config["cv iters"] = 5
+    config["cv iters"] = 1
     config["cv split key"] = "id"
     config["feature importance"] = True
     config["feature importance method"] = "FeatureImportance"
@@ -313,9 +313,9 @@ def get_xgboost_baseline_config(model_params={"max_depth":10, "n_jobs:":-1, "n_e
 def get_baseline_cv_configs(pipeline="", model_names=["catboost"]):
     configs = dict()
     if "ada" in model_names:
-        depths = [1, 2, 3, 4]
-        ns = [250, 500]
-        lrs = [0.1, 0.25, 0.5, 1]
+        depths = [2, 5]
+        ns = [100, 200]
+        lrs = [0.1, 0.25, 0.5]
         for d in depths:
             for lr in lrs:
                 for n in ns:
@@ -323,12 +323,12 @@ def get_baseline_cv_configs(pipeline="", model_names=["catboost"]):
                     configs[("adaboost", d, lr, n)] = get_base_config(model_fn=AdaBoostClassifier,model_params=par,pipeline=pipeline)
     if "catboost" in model_names:
 
-        depths = [7]
+        depths = [5]
         objectives = ["Logloss", "CrossEntropy"]
-        ns = [250, 500]
-        lrs = [0.01, 0.05]
-        l2_leaf_regs = [1, 3, 6]
-        rsms = [.5, 1]
+        ns = [100, 200]
+        lrs = [0.01, 0.05, .1, .5]
+        l2_leaf_regs = [1, 5, 9, 13]
+        rsms = [.5, .75]
         class_weights = [None, "Balanced"]
 
         for d in depths:

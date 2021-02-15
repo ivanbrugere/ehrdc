@@ -19,6 +19,7 @@ import warnings
 import os
 import glob
 import catboost as ct
+import ujson as json
 
 #RUN COVID PIPELINE
 covid = True
@@ -79,12 +80,23 @@ if "train" in config and config["train"]:
 
             aa = np.transpose(np.vstack(
                 ([int(v) for k, v in list(uids.keys())], [int(v) for k, v in list(uids.keys())])))
-            pd.DataFrame(aa).to_csv(config["output path"]+ "features.csv", header=None, index=None)
-            print(config["output path"]+ "features.csv")
+            if not covid:
+                pd.DataFrame(aa).to_csv(os.path.join(config["output path"], "features.csv"), header=None, index=None)
+                print(config["output path"]+ "features.csv")
             if importances is not None:
-                pd.DataFrame(importances).to_csv(config["output path"]+ "feature_weights.csv", header=None, index=None)
-                print(config["output path"]+ "feature_weights.csv")
-            model_configs.pickle_nms(config_select, config["model path"] + "config.joblib")
+                if not covid:
+
+                    pd.DataFrame(importances).to_csv(os.path.join(config["output path"], "feature_weights.csv"), header=None, index=None)
+                    print(config["output path"] + "feature_weights.csv")
+                else:
+
+                    r = model_includes.features_todict(aa[:, 0], importances, os.path.join(config["train path"], "concept.csv"))
+                    with open(os.path.join(config["output path"], "features.json"), "w") as f:
+                        json.dump([{"Features":r}], f)
+                    print(config["output path"] + "features.json")
+
+
+            model_configs.pickle_nms(config_select, os.path.join(config["model path"], "config.joblib"))
             #jl.dump(config_select, config["model path"] + "config.joblib")
             # jl.dump(uids, config["model path"] + "uids.joblib")
             # print(config["model path"] + "uids.joblib")
