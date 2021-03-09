@@ -81,19 +81,19 @@ if "train" in config and config["train"]:
             aa = np.transpose(np.vstack(
                 ([int(v) for k, v in list(uids.keys())], [int(v) for k, v in list(uids.keys())])))
             if not covid:
-                pd.DataFrame(aa).to_csv(os.path.join(config["output path"], "features.csv"), header=None, index=None)
-                print(config["output path"]+ "features.csv")
+                pd.DataFrame(aa).to_csv(os.path.join(config["model path"], "features.csv"), header=None, index=None)
+                print(config["model path"]+ "features.csv")
             if importances is not None:
                 if not covid:
 
-                    pd.DataFrame(importances).to_csv(os.path.join(config["output path"], "feature_weights.csv"), header=None, index=None)
-                    print(config["output path"] + "feature_weights.csv")
+                    pd.DataFrame(importances).to_csv(os.path.join(config["model path"], "feature_weights.csv"), header=None, index=None)
+                    print(config["model path"] + "feature_weights.csv")
                 else:
 
-                    r = model_includes.features_todict(aa[:, 0], importances, os.path.join(config["train path"], "concept.csv"))
-                    with open(os.path.join(config["output path"], "features.json"), "w") as f:
+                    r = model_includes.features_todict(aa[:, 0], importances, os.path.join(config["code path"],"concept.csv"))
+                    with open(os.path.join(config["model path"], "features.json"), "w") as f:
                         json.dump([{"Features":r}], f)
-                    print(config["output path"] + "features.json")
+                    print(config["model path"] + "features.json")
 
 
             model_configs.pickle_nms(config_select, os.path.join(config["model path"], "config.joblib"))
