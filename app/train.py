@@ -9,15 +9,16 @@ import time
 import models as model_includes
 import model_configs as model_configs
 from sklearn.ensemble import AdaBoostClassifier
+from sklearn.neighbors import KNeighborsClassifier
 import warnings
 import os
 import catboost as ct
 import sklearn as sk
-
-
+from sklearn.linear_model import LogisticRegression
+from sklearn.inspection import permutation_importance
+import shap
 #RUN different models
-model_names = ["catboost", "ada"]
-
+model_names = ["logistic", "ada", "catboost"]
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings("ignore", category=FutureWarning)
 t = time.time()
@@ -38,21 +39,23 @@ configs = model_configs.get_baseline_cv_configs(model_names=model_names)
 config_select, selected, perf, metrics_out, configs, uids = model_includes.model_sparse_feature_cv_train(data, configs)
 config_select["uids"] = uids
 importances = None
+config_base = list(configs.values())[0]
+date_lags = config_base["date lags"]
+
+data_sp, labels_iter = model_includes.get_sparse_person_features_mat(data)
+x_train, x_test, y_train, y_test, keys_train, keys_test = sk.model_selection.train_test_split(data_sp, list(
+    labels_iter.values()), list(labels_iter.keys()), train_size=config_base["train size"])
+
 if config["feature importance"] and isinstance(config_select["model"], AdaBoostClassifier):
     importances = config_select["model"].feature_importances_
-elif config["feature importance"] and isinstance(config_select["model"], ct.CatBoostClassifier):
-
-    config_base = list(configs.values())[0]
-    date_lags = config_base["date lags"]
-
-    data_sp, labels_iter = model_includes.get_sparse_person_features_mat(data)
-    x_train, x_test, y_train, y_test, keys_train, keys_test = sk.model_selection.train_test_split(data_sp, list(labels_iter.values()), list(labels_iter.keys()), train_size=config_base["train size"])
-
-    importances = config_select["model"].get_feature_importance(type=config["feature importance method"],
-                                                                data=model_configs.ct.Pool(x_train, y_train))
-    if config["feature importance method"] == "ShapValues":
-        importances = np.mean(importances, axis=0)
-
+elif config["feature importance"] and isinstance(config_select["model"], (ct.CatBoostClassifier)): #model_configs.PairedKnn, model_configs.NNC, KNeighborsClassifier)):
+    shap_values = shap.Explainer(config_select["model"])(x_train)
+    importances = np.mean(shap_values.values, axis=0)
+# elif config["feature importance"] and isinstance(config_select["model"], (KNeighborsClassifier)):
+#     kn = shap.KernelExplainer(config_select["model"].predict, shap.kmeans(x_train, 100))
+#     importances = np.mean(kn.shap_values(x_test).values, axis=0)
+elif config["feature importance"] and isinstance(config_select["model"], (LogisticRegression)):
+    importances = config_select["model"].coef_.flatten()
 aa = np.transpose(np.vstack(
     ([int(v) for k, v in list(uids.keys())], [int(v) for k, v in list(uids.keys())])))
 pd.DataFrame(aa).to_csv(config["output path"] + "features.csv", header=None, index=None)
