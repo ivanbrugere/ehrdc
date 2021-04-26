@@ -48,7 +48,7 @@ def get_baseline_cv_configs(model_names=["catboost"]):
                                         break
     if "logistic" in model_names:
         class_weights = [None, "balanced"]
-        solves = (("lbfgs", "l2"), ("lbfgs", "none"), ("liblinear", "l1"), ("saga", "l2"), ("saga", "l1"), ("saga", "elasticnet"))
+        solves = (("lbfgs", "l2"), ("lbfgs", "none"), ("liblinear", "l1"))
         cs = [0.05, 0.1, 0.25, .5, .75, 1, 10, 100]
         max_iter = 1000
         l1r=0.5
