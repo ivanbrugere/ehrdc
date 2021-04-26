@@ -1,10 +1,10 @@
 # Synthetic EHR Data Evaluation Pipeline
 
-This readme outlines the running of the evaluation pipeline for generative EHR models, on binary prediction targets.
+This readme outlines the running of the evaluation pipeline for generative EHR models, on binary or continuous features, for binary prediction targets.
 
 ### Prerequisites
 
-The prerequisites are ideally installed into a docker environment using the included Docker file. Or can be installed manually: 
+This pipeline depends on the following non-standard libraries: 
 
 ```
 catboost
