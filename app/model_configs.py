@@ -4,7 +4,6 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 import os
 from sklearn.exceptions import NotFittedError
-import joblib as jl
 from pathlib import Path
 import catboost as ct
 
@@ -12,7 +11,7 @@ os.environ["OMP_NUM_THREADS"] = "8"
 
 def get_baseline_cv_configs(model_names=["catboost"]):
     configs = dict()
-    if "ada" in model_names:
+    if "adaboost" in model_names:
         depths = [1, 2, 3, 4]
         ns = [250, 500]
         lrs = [0.1, 0.25, 0.5, 1]
@@ -100,13 +99,6 @@ def is_fitted(m, data):
     except (NotFittedError):#, xgb.core.XGBoostError):
         return 0
 
-def pickle_nms(config, file):
-    jl.dump(config, file)
-
-def unpickle_nms(file):
-    config = jl.load(file)
-    return config
-
 def get_base_config(model_fn=None, model_params={}, name=None):
     config = {}
     if name is None:
@@ -115,29 +107,14 @@ def get_base_config(model_fn=None, model_params={}, name=None):
         config["model name"] = name
 
     if model_fn is None:
-        config["model_fn"] = GradientBoostingClassifier
+        config["model_fn"] = ct.CatBoostClassifier
     else:
         config["model_fn"] = model_fn
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
     prefix = Path(os.getcwd()).parent
-    config["model path"] = os.path.join(prefix, "model", "")
     config["output path"] = os.path.join(prefix, "output", "")
-    config["scratch path"] = os.path.join(prefix, "scratch", "")
     config["train npy"] = {"path": os.path.join("..", "train", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels":"y"}}
     config["test npy"] = {"path": os.path.join("..", "test", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels": "y"}}
-    config["train"] = True
-    config["do cv"] = True
-    config["date lags"] = [[0]]
-    config["join field"] = "person_id"
-    config["cv iters"] = 3
-    config["cv split key"] = "id"
-    config["feature importance"] = True
+    config["k folds"] = 10
     return config
-
-def get_default_train_test(config):
-    if "train size" not in config:
-        config["train size"] = 0.5
-    return config
-
-

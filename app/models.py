@@ -1,13 +1,21 @@
 import pandas as pd
 import numpy as np
 import collections as c
-import os
 import operator
-import sklearn as sk
 import scipy.sparse as sp
 import time
+from sklearn.ensemble import AdaBoostClassifier
+import os
+import catboost as ct
+import sklearn as sk
+from sklearn.linear_model import LogisticRegression
+import shap
+
 if os.path.basename(os.getcwd()) != "app":
     os.chdir(os.getcwd() +'/app')
+
+from sklearn.model_selection import KFold
+
 
 import model_configs as model_configs
 
@@ -35,79 +43,59 @@ def model_sparse_feature_test(data, config):
 
     keys_iter = pd.Series(list(p_ids.keys()), name="person_id")
 
-    print("Inference time:" + str(time.time() - t), flush=True)
     p[p < 0] = 0
     p[p>1] = 1
     p[np.isnan(p)] = 0
+    print("Inference time: " + str(time.time() - t), flush=True)
     return pd.DataFrame(p[:, 1], index=keys_iter, columns=["score"])
+def get_importances(data, config_select):
+    if isinstance(config_select["model"], AdaBoostClassifier):
+        importances = config_select["model"].feature_importances_
+    elif isinstance(config_select["model"],ct.CatBoostClassifier):
+        shap_values = shap.Explainer(config_select["model"])(data)
+        importances = np.mean(shap_values.values, axis=0)
+    elif isinstance(config_select["model"], LogisticRegression):
+        importances = config_select["model"].coef_.flatten()
+    return pd.DataFrame(importances, index=pd.Series(range(data["x"].shape[1]), name="feature_id"), columns=["importance"])
 
-def model_sparse_feature_cv_train(data, configs):
-    t = time.time()
+def model_selection_and_evaluation(data, data_eval, configs):
     config_base = list(configs.values())[0]
-    date_lag = [0]
-
-    iters = config_base["cv iters"]
-    uids_feats = dict(zip(zip(range(data["x"].shape[1]), range(data["x"].shape[1])), range(data["x"].shape[1])))
-
     metrics_out = c.defaultdict(list)
-    print("Data build time: " + str(time.time() - t), flush=True)
-    tt = time.time()
-
-    labels_store = {}
+    selected_full = []
+    importances_full = []
+    p_full = []
 
     data_sp, labels_iter = get_sparse_person_features_mat(data)
-    labels_store[tuple(date_lag)] = labels_iter
-    for ii in range(iters):
-        config_base = model_configs.get_default_train_test(config_base)
-        x_train, x_test, y_train, y_test, keys_train, keys_test = sk.model_selection.train_test_split(data_sp, list(labels_iter.values()), list(labels_iter.keys()), train_size=config_base["train size"])
-        print("CV Train data: " + str((x_train.shape, x_train.nnz, x_train.dtype)), flush=True)
-        print("CV Test data: " + str((x_test.shape, x_test.nnz, x_test.dtype)), flush=True)
+
+    kf = KFold(n_splits=config_base["k folds"], shuffle=True)
+    X = data_sp
+    y = np.array(list(labels_iter.values()))
+
+    for ii, (idx_train, idx_test) in enumerate(kf.split(data_sp, list(labels_iter.values()), list(labels_iter.keys()))):
+        print("Split:{}/{}".format(ii, config_base["k folds"]))
+        x_train, x_test = X[idx_train], X[idx_test]
+        y_train, y_test = y[idx_train], y[idx_test]
+        tt = time.time()
 
         for key_c, config in configs.items():
             model_configs.reset_model(config["model"])
         for jj, (key_c, config) in enumerate(configs.items()):
-            key_c = (key_c, tuple(date_lag))
-            print("(Model,iteration, %): " + str((key_c, ii, jj/len(configs))), flush=True)
-
             #train
-            ttt = time.time()
             config["model"].fit(x_train, np.array(y_train))
-            print("CV Train: " + str(time.time() - ttt), flush=True)
-
             #eval
-            ttt = time.time()
             y_pred = config["model"].predict_proba(x_test)
-            print("CV Predict: " + str(time.time() - ttt), flush=True)
             metrics_out[key_c].append(sk.metrics.roc_auc_score(y_test, y_pred[:, 1]))
-    perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
-    selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
-    config_select = configs[selected[0]]
-    config_select["date lag"] = selected[1]
-    print("Selected: " + str(selected),flush=True)
-    print(perf,flush=True)
-    print("Training full selected model",flush=True)
-    model_configs.reset_model(config_select["model"])
-    config_select["model"].fit(data_sp, np.array(list(labels_store[selected[1]].values())))
+        perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
+        selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
+        config_select = configs[selected]
 
-    config_select["train shape"] = data_sp.shape
-    print("Model cv time: " + str(time.time() - tt), flush=True)
-    return config_select, selected, perf, metrics_out, configs, uids_feats
-
-
-def evaluate_paired_model(config_select, data_sp, y_label=None, train=False, x_apps=[]):
-    for k,vm in config_select["model"]["nets"].items():
-        vm.train_nn(data_sp, y_label)
-        if not x_apps:
-            y_net_pred = vm.predict_proba(data_sp)[:, 1]
-            x_apps.append(sp.csr_matrix((y_net_pred, (range(len(y_net_pred)), np.zeros(len(y_net_pred)))),
-                                  shape=(len(y_net_pred), 1)))
-    data_sp_iter = sp.hstack([data_sp] + x_apps).tocsr()
-    if train:
-        config_select["model"]["pred"].fit(data_sp_iter, y_label)
-        return x_apps
-    else:
-        return config_select["model"]["pred"].predict_proba(data_sp_iter), x_apps
-
+        p = model_sparse_feature_test(data_eval, config_select)
+        importances = get_importances(data_eval, config_select)
+        selected_full.append(configs[selected].copy())
+        p_full.append(p)
+        importances_full.append(importances)
+        print("Fold time: {}".format(time.time() - tt))
+    return selected_full, pd.concat(importances_full, axis=1), pd.concat(p_full, axis=1)
 
 
 def get_sparse_person_features_mat(data_np):
