@@ -25,6 +25,6 @@ data_eval = model_includes.read_ehrdc_data(config["test npy"])
 configs = model_configs.get_baseline_cv_configs(model_names=model_names)
 
 selected_models, importances, preds  = model_includes.model_selection_and_evaluation(data, data_eval, configs)
-importances.to_pickle(config["output path"] + "feature_weights.gz")
-preds.to_pickle(config["output path"] + "predictions.gz")
+importances.to_csv(config["output path"] + "feature_weights.csv")
+preds.to_csv(config["output path"] + "predictions.csv")
 jl.dump(selected_models, config["output path"] + "models.gz")

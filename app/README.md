@@ -58,6 +58,6 @@ See [here](https://github.com/ivanbrugere/ehrdc/blob/ffb53389566b044c91ae5422f1e
 
 This pipeline outputs the following in the specified output path:
 
-* Models (models.gz): List of best-performing models in each fold (List, [1 x k])
-* Feature importance (feature_weights.gz): DataFrame of the feature importance associated with the above k models (DataFrame, [ F x k])
-* Prediction scores (predictions.gz): Dataframe of the test set evaluation of each k model (DataFrame, [$N_{test}$ x k])
+* Models (models.gz): List of best-performing models in each fold (List[Object], [1 x k])
+* Feature importance (feature_weights.csv): CSV of the feature importance associated with the above k models ([F x k])
+* Prediction scores (predictions.csv): CSV of the test set evaluation of each k model ([$N_{test}$ x k])
