@@ -15,26 +15,24 @@ shap
 The train.py script has several options to set:
 
 ### Models
-```model_names = ["logistic", "ada", "catboost"]``` ([permalink](https://github.com/ivanbrugere/ehrdc/blob/693bfe18a2c1b5f48cf758528185aec597846b75/app/train.py#L21)) 
+```model_names = ["logistic", "ada", "catboost"]``` ([permalink](https://github.com/ivanbrugere/ehrdc/blob/ffb53389566b044c91ae5422f1e6ef428ccf7687/app/train.py#L12)) 
 
 
-The [get_baseline_cv_configs](https://github.com/ivanbrugere/ehrdc/blob/693bfe18a2c1b5f48cf758528185aec597846b75/app/model_configs.py#L13) defines the models and their hyper-parameters to be evaluated according to the passed 'model_names'
+The [get_baseline_cv_configs](https://github.com/ivanbrugere/ehrdc/blob/ffb53389566b044c91ae5422f1e6ef428ccf7687/app/model_configs.py#L12) defines the models and their hyper-parameters to be evaluated according to the passed 'model_names'
 
-The [get_base_config](https://github.com/ivanbrugere/ehrdc/blob/693bfe18a2c1b5f48cf758528185aec597846b75/app/model_configs.py#L110) defines paths and other pipeline parameters, two important defaults are:
-
-
-```config["cv iters"] = 3 ``` ([permalink](https://github.com/ivanbrugere/ehrdc/blob/457b03eacc506efc0f04ce2ba2e93d17f5e39df3/app/model_configs.py#L133))
+The [get_base_config](https://github.com/ivanbrugere/ehrdc/blob/ffb53389566b044c91ae5422f1e6ef428ccf7687/app/model_configs.py#L102) defines paths and other pipeline parameters, two important defaults are:
 
 
-This adjusts the number of randomized train-test splits to evaluate each model model over. Increasing this yields a more robust estimate of relative model accuracy. Selection is done over the maximum-mean model. 
+```config["k folds"] = 10 ``` ([permalink](https://github.com/ivanbrugere/ehrdc/blob/ffb53389566b044c91ae5422f1e6ef428ccf7687/app/model_configs.py#L119))
 
-Note that all models are evaluated on the same train-test split per iteration (rather than sampling a new split per model, per iter). 
+
+This adjusts the number of folds in k-fold validation.  
 
 ### Paths
 
 ```config["train npy"] = {"path": os.path.join("..", "train", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels":"y"}}```
 
-*  This [line](https://github.com/ivanbrugere/ehrdc/blob/693bfe18a2c1b5f48cf758528185aec597846b75/app/model_configs.py#L127) specifies the paths to training data. 
+*  This [line](https://github.com/ivanbrugere/ehrdc/blob/ffb53389566b044c91ae5422f1e6ef428ccf7687/app/model_configs.py#L117) specifies the paths to training data. 
 *  The 'map' key specifies two numpy matrices found in 'path.' These matrices are of size [MxF] and [NxF] for negative and positive class instances, and labels are created with the associated value within the map (e.g. negative.npy → 0). 
 *  The 'field' key specifies the output dictionary for the data and labels, e.g. d["x"] and d["y"] in the above example. (This shouldn't need changing)
 
@@ -48,9 +46,18 @@ In summary, the pipeline expects the following files:
 
 ## Feature importance
 
-I am outputting feature importance scores to:
-```
-./output/feature_weights.csv
-```
+This pipeline generates feature importance. The importance is given by:
 
-This is currently implemented in Adaboost, CatBoost, and Logistic Regression models. Feature importance evaluation need be handled for new models [here](https://github.com/ivanbrugere/ehrdc/blob/457b03eacc506efc0f04ce2ba2e93d17f5e39df3/app/train.py#L49).
+* Logistic regression: The learned feature weights of the model
+* Adaboost: the internal Gini importance from the sklearn library
+* Catboost: the mean shap value across *test* instances. 
+
+See [here](https://github.com/ivanbrugere/ehrdc/blob/ffb53389566b044c91ae5422f1e6ef428ccf7687/app/models.py#L51).
+
+## Output
+
+This pipeline outputs the following in the specified output path:
+
+* Models (models.gz): List of best-performing models in each fold (List, [1 x k])
+* Feature importance (feature_weights.gz): DataFrame of the feature importance associated with the above k models (DataFrame, [ F x k])
+* Prediction scores (predictions.gz): Dataframe of the test set evaluation of each k model (DataFrame, [$N_{test}$ x k])
