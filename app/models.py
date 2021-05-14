@@ -56,7 +56,7 @@ def get_importances(data, config_select):
         importances = np.mean(shap_values.values, axis=0)
     elif isinstance(config_select["model"], LogisticRegression):
         importances = config_select["model"].coef_.flatten()
-    return pd.DataFrame(importances, index=pd.Series(range(data["x"].shape[1]), name="feature_id"), columns=["importance"])
+    return pd.DataFrame(importances, index=pd.Series(range(data.shape[1]), name="feature_id"), columns=["importance"])
 
 def model_selection_and_evaluation(data, data_eval, configs):
     config_base = list(configs.values())[0]
@@ -90,7 +90,7 @@ def model_selection_and_evaluation(data, data_eval, configs):
         config_select = configs[selected]
 
         p = model_sparse_feature_test(data_eval, config_select)
-        importances = get_importances(data_eval, config_select)
+        importances = get_importances(data_eval["x"], config_select)
         selected_full.append(configs[selected].copy())
         p_full.append(p)
         importances_full.append(importances)
