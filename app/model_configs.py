@@ -9,7 +9,7 @@ import catboost as ct
 
 os.environ["OMP_NUM_THREADS"] = "8"
 
-def get_baseline_cv_configs(model_names=["catboost"]):
+def get_baseline_cv_configs(model_names=["catboost"], config_params={}):
     configs = dict()
     if "adaboost" in model_names:
         depths = [1, 2, 3, 4]
@@ -19,7 +19,7 @@ def get_baseline_cv_configs(model_names=["catboost"]):
             for lr in lrs:
                 for n in ns:
                     par = {"n_estimators": n, "learning_rate": lr, "base_estimator": DecisionTreeClassifier(max_depth=d)}
-                    configs[("adaboost", d, lr, n)] = get_base_config(model_fn=AdaBoostClassifier,model_params=par)
+                    configs[("adaboost", d, lr, n)] = get_base_config(model_fn=AdaBoostClassifier,model_params=par, **config_params)
     if "catboost" in model_names:
 
         depths = [7]
@@ -42,7 +42,7 @@ def get_baseline_cv_configs(model_names=["catboost"]):
                                     if o == "CrossEntropy":
                                         w = ()
                                         del par["auto_class_weights"]
-                                    configs[("catboost", d, o, lr, l2, rsm, w, n)] = get_base_config(model_fn=ct.CatBoostClassifier, model_params=par)
+                                    configs[("catboost", d, o, lr, l2, rsm, w, n)] = get_base_config(model_fn=ct.CatBoostClassifier, model_params=par, **config_params)
                                     if o == "CrossEntropy":
                                         break
     if "logistic" in model_names:
@@ -60,7 +60,7 @@ def get_baseline_cv_configs(model_names=["catboost"]):
                         par["l1_ratio"] = l1r
 
                     configs[("logistic", w, ci, s1, s2)] = get_base_config(model_fn=LogisticRegression,
-                                                                                model_params=par)
+                                                                                model_params=par, **config_params)
                     if s2 == "none":
                         break
     # if "knn" in model_names:
@@ -99,22 +99,35 @@ def is_fitted(m, data):
     except (NotFittedError):#, xgb.core.XGBoostError):
         return 0
 
-def get_base_config(model_fn=None, model_params={}, name=None):
+def get_base_config(model_fn=None, model_params={}, output_path=None, train_npy=None, test_npy=None, load_model=None, k_folds=None):
+    prefix = Path(os.getcwd()).parent
     config = {}
-    if name is None:
-        config["model name"] = "static uid model selection"
-    else:
-        config["model name"] = name
+
 
     if model_fn is None:
         config["model_fn"] = ct.CatBoostClassifier
     else:
         config["model_fn"] = model_fn
+
+
+    defaults = [output_path,
+                train_npy,
+                test_npy,
+                load_model,
+                k_folds]
+    default_vals = {"output path":os.path.join(prefix, "output", ""),
+                    "train npy": {"path": os.path.join("..", "train", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels":"y"}},
+                    "test npy": {"path": os.path.join("..", "test", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels": "y"}},
+                    "load model": True,
+                    "k folds": 10}
+
+    for v, (kk, default_v) in zip(defaults, default_vals.items()):
+        if v is None:
+            config[kk] = default_v
+        else:
+            config[kk] = v
+
     config["model_params"] = model_params
     config["model"] = config["model_fn"](**model_params)
-    prefix = Path(os.getcwd()).parent
-    config["output path"] = os.path.join(prefix, "output", "")
-    config["train npy"] = {"path": os.path.join("..", "train", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels":"y"}}
-    config["test npy"] = {"path": os.path.join("..", "test", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels": "y"}}
-    config["k folds"] = 10
+
     return config
