@@ -93,7 +93,6 @@ def model_selection_and_evaluation(data, data_eval, configs):
         perf = {k: {"mean": np.mean(v), "std": np.std(v)} for k,v in metrics_out.items()}
         selected, selected_mean = sorted({k:v["mean"] for k,v in perf.items()}.items(), key=operator.itemgetter(1))[::-1][0]
         config_select = configs[selected]
-        jl.dump(config_select, model_path)
 
     p = model_sparse_feature_test(data_eval, config_select)
     importances, importances_mat = get_importances(data_eval["x"], config_select)

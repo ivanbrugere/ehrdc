@@ -6,7 +6,8 @@ import os
 from sklearn.exceptions import NotFittedError
 from pathlib import Path
 import catboost as ct
-
+import time
+import datetime
 os.environ["OMP_NUM_THREADS"] = "8"
 
 def get_baseline_cv_configs(model_names=["catboost"], config_params={}):
@@ -115,7 +116,8 @@ def get_base_config(model_fn=None, model_params={}, output_path=None, train_npy=
                 test_npy,
                 load_model,
                 k_folds]
-    default_vals = {"output path":os.path.join(prefix, "output", ""),
+    t = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    default_vals = {"output path": os.path.join(prefix, "output" + "_{}".format(t), ""),
                     "train npy": {"path": os.path.join("..", "train", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels":"y"}},
                     "test npy": {"path": os.path.join("..", "test", ""), "map": {"negative.npy": 0, "positive.npy": 1}, "fields": {"data": "x", "labels": "y"}},
                     "load model": True,
